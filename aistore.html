@@ -1,0 +1,169 @@
+<!--
+MIT License
+
+Copyright (c) 2026 Decentralized Science Labs
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+-->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+<link rel="preconnect" href="https://genesisl1.com" crossorigin />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<meta name="description" content="Explore AI models listed for sale in the GenesisL1 Forest AI Store. Buy Model NFTs to transfer ownership and access on-chain inference." />
+<meta name="keywords" content="AI store, AI marketplace, buy model NFT, GenesisL1, on-chain AI, decentralized marketplace, model NFTs" />
+<meta name="author" content="Decentralized Science Labs" />
+<meta name="robots" content="index,follow" />
+<meta name="theme-color" content="#0f172a" />
+
+<meta property="og:title" content="GenesisL1 Forest — AI Store Marketplace" />
+<meta property="og:description" content="Explore AI models listed for sale in the GenesisL1 Forest AI Store. Buy Model NFTs to transfer ownership and access on-chain inference." />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="GenesisL1 Forest" />
+<meta property="og:image" content="https://genesisl1.com/logo.svg" />
+
+<meta name="twitter:card" content="summary" />
+<meta name="twitter:title" content="GenesisL1 Forest — AI Store Marketplace" />
+<meta name="twitter:description" content="Explore AI models listed for sale in the GenesisL1 Forest AI Store. Buy Model NFTs to transfer ownership and access on-chain inference." />
+<meta name="twitter:image" content="https://genesisl1.com/logo.svg" />
+<title>GenesisL1 Forest — AI Store Marketplace</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="./style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.12.1/dist/ethers.umd.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <div class="topbar">
+      <div class="brand">
+        <a class="brand" href="./index.html" style="text-decoration:none;">
+       <img src="https://genesisl1.com/logo.svg" alt="GenesisL1" style="width:28px; height:28px;" /> GenesisL1 Forest </a>
+      </div>
+      <button class="btn navToggle" type="button" aria-label="Menu" aria-controls="siteNav" aria-expanded="false"><span class="navToggleIcon" aria-hidden="true"></span></button>
+      <div class="nav" id="siteNav" aria-label="Primary navigation">
+        <a class="btn ghost" data-nav="forest" href="./forest.html">AI Models</a>
+        <a class="btn ghost" data-nav="market" href="./aistore.html">AI Store</a>
+        <a class="btn ghost" data-nav="create" href="./create.html">Create</a>
+        <a class="btn ghost" data-nav="my" href="./my.html">My Models</a>
+        <a class="btn ghost" data-nav="terms" href="./terms.html">Terms</a>
+        <span class="pill" id="walletPill">Read-only (RPC)</span>
+        <button class="btn primary" id="connectBtn">Connect Wallet</button>
+      </div>
+    </div>
+
+    <div class="hero">
+      <h1>AI Store Marketplace</h1>
+      <p class="muted">Only models actively listed for sale are shown here. Buying transfers the Model NFT.</p>
+
+      <div class="row spread" style="flex-wrap: wrap;">
+        <div style="flex: 1; min-width: 320px;">
+          <label>Search title (words)</label>
+          <input id="searchBox" placeholder="e.g. age predictor" />
+          <div class="muted">Search uses the on-chain title-word index. Results are filtered to “listed for sale”.</div>
+        </div>
+        <div class="row" style="margin-top: 22px;">
+          <button class="btn primary" id="applyBtn">Apply</button>
+          <button class="btn" id="clearBtn">Clear</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="row spread">
+        <div class="row">
+          <span class="pill" id="countPill">0 listed</span>
+          <span class="pill" id="pagePill">Page</span>
+        </div>
+        <div class="row">
+          <button class="btn" id="prevBtn">Prev</button>
+          <button class="btn" id="nextBtn">Next</button>
+        </div>
+      </div>
+      <div class="sep"></div>
+      <div class="cards" id="cards"></div>
+    </div>
+
+  </div>
+
+  <!-- Debug dock -->
+  <div id="debugDock" class="debug-dock">
+    <div class="debug-head">
+      <div class="left">
+        <span class="debug-badge">Debug</span>
+        <span id="dbgState">idle</span>
+        <span id="dbgConn" class="debug-badge" style="font-weight:650;">not connected</span>
+      </div>
+      <div class="right" style="display:flex; gap:6px; flex-wrap:wrap;">
+        <button id="dbgCollapse" class="dbg-btn" type="button">Collapse</button>
+        <button id="dbgCopy" class="dbg-btn" type="button">Copy</button>
+        <button id="dbgClear" class="dbg-btn" type="button">Clear</button>
+      </div>
+    </div>
+    <pre id="debugLines" class="debug-lines"></pre>
+  </div>
+  <div id="debugFab" class="debug-fab" hidden title="Show debug">🐞</div>
+
+
+  <script type="module" src="./src/market_page.js"></script>
+
+  <script>
+    (() => {
+      const topbar = document.querySelector(".topbar");
+      const toggle = document.querySelector(".navToggle");
+      const nav = document.getElementById("siteNav");
+      if (!topbar || !toggle || !nav) return;
+
+      const setOpen = (open) => {
+        topbar.classList.toggle("menu-open", open);
+        toggle.setAttribute("aria-expanded", open ? "true" : "false");
+      };
+
+      toggle.addEventListener("click", (e) => {
+        e.preventDefault();
+        setOpen(!topbar.classList.contains("menu-open"));
+      });
+
+      // Close when a link is selected (best for mobile)
+      nav.addEventListener("click", (e) => {
+        if (e.target.closest("a")) setOpen(false);
+      });
+
+      // Close when clicking outside the topbar
+      document.addEventListener("click", (e) => {
+        if (!topbar.contains(e.target) && topbar.classList.contains("menu-open")) setOpen(false);
+      });
+
+      // Close on Escape
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") setOpen(false);
+      });
+
+      // Reset when returning to desktop
+      window.addEventListener("resize", () => {
+        if (window.innerWidth > 860) setOpen(false);
+      });
+    })();
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,909 @@
+<!--
+MIT License
+
+Copyright (c) 2026 Decentralized Science Labs
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+-->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+<link rel="preconnect" href="https://genesisl1.com" crossorigin />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<meta name="description" content="Train a GBDT model in-browser (regression or classification), preview locally, then mint it as an on-chain Model NFT on GenesisL1." />
+<meta name="keywords" content="train AI model in browser, GBDT training, mint model NFT, on-chain machine learning, GenesisL1, decentralized AI studio, gradient boosted trees" />
+<meta name="author" content="Decentralized Science Labs" />
+<meta name="robots" content="index,follow" />
+<meta name="theme-color" content="#0f172a" />
+
+<meta property="og:title" content="GenesisL1 Forest — Create & Mint an AI Model NFT" />
+<meta property="og:description" content="Train a GBDT model in-browser (regression or classification), preview locally, then mint it as an on-chain Model NFT on GenesisL1." />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="GenesisL1 Forest" />
+<meta property="og:image" content="https://genesisl1.com/logo.svg" />
+
+<meta name="twitter:card" content="summary" />
+<meta name="twitter:title" content="GenesisL1 Forest — Create & Mint an AI Model NFT" />
+<meta name="twitter:description" content="Train a GBDT model in-browser (regression or classification), preview locally, then mint it as an on-chain Model NFT on GenesisL1." />
+<meta name="twitter:image" content="https://genesisl1.com/logo.svg" />
+<title>GenesisL1 Forest — Create & Mint an AI Model NFT</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="./style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.12.1/dist/ethers.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.27.0/plotly.min.js"></script>
+
+  <!-- Feature importance table styles (create page only) -->
+  <style>
+    .fiBox{ margin-top: 18px; }
+
+    /* Tables: responsive, no horizontal scrolling */
+    .fiTableWrap{
+      overflow-x: clip;
+      overflow-y: auto;
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius);
+      background: var(--bg-panel);
+    }
+
+    table.fiTable{
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    table.fiTable thead th{
+      position: sticky; top: 0; z-index: 1;
+      text-align: left;
+      font-size: 0.72rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-label);
+      background: var(--bg-input);
+      border-bottom: 1px solid var(--border-light);
+      padding: 10px 12px;
+      white-space: normal;
+      line-height: 1.2;
+    }
+
+    table.fiTable tbody td{
+      border-bottom: 1px solid var(--border-light);
+      padding: 10px 12px;
+      vertical-align: top;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.86rem;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+
+    table.fiTable tbody tr:hover{ background: rgba(37, 99, 235, 0.06); }
+    .fiName{ font-family: 'Inter', sans-serif !important; font-weight: 700; white-space: normal; }
+    .fiSmall{ font-family: 'Inter', sans-serif !important; font-size: 0.85rem; color: var(--text-muted); white-space: normal; }
+    .fiPos{ color: #16a34a; font-weight: 700; }
+    .fiNeg{ color: #b91c1c; font-weight: 700; }
+    .fiZero{ color: var(--text-muted); }
+    .fiTag{ display:inline-flex; align-items:center; gap:8px; }
+    .fiDot{ width:8px; height:8px; border-radius:50%; display:inline-block; }
+    .fiDot.pos{ background:#16a34a; }
+    .fiDot.neg{ background:#b91c1c; }
+    .fiDot.neu{ background:#64748b; }
+
+    /* Responsive table layout (no horizontal scroll): becomes row-cards on small screens */
+    @media (max-width: 720px){
+      table.fiTable.resp thead{ display:none; }
+      table.fiTable.resp,
+      table.fiTable.resp tbody,
+      table.fiTable.resp tr,
+      table.fiTable.resp td{ display:block; width:100%; }
+
+      table.fiTable.resp tr{
+        border: 1px solid var(--border-light);
+        border-radius: 14px;
+        margin: 12px 0;
+        overflow: hidden;
+        background: rgba(255,255,255,0.65);
+      }
+
+      table.fiTable.resp tbody td{
+        border-bottom: 1px solid var(--border-light);
+        padding: 10px 12px;
+        display:flex;
+        align-items:flex-start;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      table.fiTable.resp tbody td::before{
+        content: attr(data-label);
+        flex: 0 0 42%;
+        font-family: 'Inter', sans-serif;
+        font-weight: 800;
+        font-size: 0.70rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-label);
+        padding-top: 2px;
+      }
+
+      table.fiTable.resp tbody td:last-child{ border-bottom:none; }
+    }
+
+    /* Nice stacked content inside cells */
+    .stStack{ display:flex; flex-direction:column; gap:6px; }
+    .stLine{ display:flex; flex-wrap:wrap; gap:10px; align-items:baseline; }
+    .stK{ font-family:'Inter', sans-serif; font-weight:800; font-size:0.72rem; letter-spacing:0.06em; text-transform:uppercase; color: var(--text-label); }
+    .stV{ font-family:'JetBrains Mono', monospace; font-weight:700; }
+    .stMuted{ font-family:'Inter', sans-serif; font-size:0.84rem; color: var(--text-muted); }
+
+    
+
+    /* Collapsible cards */
+    .detailsCard{
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius);
+      background: rgba(255,255,255,0.70);
+      padding: 14px 14px;
+    }
+    .detailsCard > summary{
+      cursor: pointer;
+      list-style: none;
+      display:flex;
+      align-items:center;
+      justify-content: space-between;
+      gap: 14px;
+      font-family: 'Inter', sans-serif;
+      font-weight: 900;
+      letter-spacing: -0.01em;
+    }
+    .detailsCard > summary::-webkit-details-marker{ display:none; }
+    details.detailsCard > summary .sumHint{
+      font-weight: 700;
+      font-size: 0.92rem;
+      color: var(--text-muted);
+    }
+    .detailsCard[open] > summary{ margin-bottom: 12px; }
+
+    .sep.mini{ margin: 12px 0; }
+
+    /* Imbalance rows */
+    .imbList{ display:flex; flex-direction:column; gap: 10px; }
+    .imbRow{
+      display:flex;
+      align-items:flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 12px;
+      border: 1px solid var(--border-light);
+      border-radius: 12px;
+      background: var(--bg-input);
+    }
+    .imbLeft{ display:flex; flex-direction:column; gap: 4px; min-width: 0; }
+    .imbName{ font-family:'Inter', sans-serif; font-weight: 900; overflow-wrap:anywhere; }
+    .imbMeta{ font-family:'Inter', sans-serif; font-size: 0.86rem; color: var(--text-muted); overflow-wrap:anywhere; }
+    .imbInput{ width: 120px; flex: 0 0 auto; }
+
+/* Heuristic search table (create page only) */
+    tr.searchRunning{ background: rgba(37, 99, 235, 0.06); }
+    tr.searchBest{ background: rgba(34, 197, 94, 0.10); }
+    tr.searchError{ background: rgba(185, 28, 28, 0.06); }
+  </style>
+</head>
+<body class="page-create">
+  <div class="container">
+    <div class="topbar">
+      <div class="brand">
+        <a class="brand" href="./index.html" style="text-decoration:none;">
+       <img src="https://genesisl1.com/logo.svg" alt="GenesisL1" style="width:28px; height:28px;" /> GenesisL1 Forest </a>
+      </div>
+      <button class="btn navToggle" type="button" aria-label="Menu" aria-controls="siteNav" aria-expanded="false"><span class="navToggleIcon" aria-hidden="true"></span></button>
+      <div class="nav" id="siteNav" aria-label="Primary navigation">
+        <a class="btn ghost" data-nav="forest" href="./forest.html">AI Models</a>
+        <a class="btn ghost" data-nav="market" href="./aistore.html">AI Store</a>
+        <a class="btn ghost" data-nav="create" href="./create.html">Create</a>
+        <a class="btn ghost" data-nav="my" href="./my.html">My Models</a>
+        <a class="btn ghost" data-nav="terms" href="./terms.html">Terms</a>
+        <span class="pill" id="walletPill">Read-only (RPC)</span>
+        <button class="btn primary" id="connectBtn">Connect Wallet</button>
+      </div>
+    </div>
+
+    <div class="hero">
+      <h1>Create &amp; Tokenize an AI Model</h1>
+      <p class="muted">
+        Train a GBDT model in your browser (<b>regression</b>, <b>binary classification</b>, <b>multiclass classification</b>, <b>multilabel classification</b> ), preview locally,
+        then deploy to GenesisL1 as a Model NFT.
+        The model bytes are stored on-chain (chunked). Feature labels + task type + (optional) class labels + icon + title are stored on-chain in the NFT.
+      </p>
+    </div>
+
+    <!-- Create flow (vertical tabs + single-column content) -->
+    <div class="createShell">
+      <aside class="createSide">
+        <div id="createTabs" class="create-tabs vertical sticky" role="tablist" aria-label="Create flow" aria-orientation="vertical">
+      <button class="create-tab active" id="tab-dataset" role="tab" aria-selected="true" aria-controls="panel-dataset" tabindex="0" data-tab="dataset" type="button">
+        <span class="step">1</span>
+        <span>Dataset</span>
+      </button>
+      <button class="create-tab" id="tab-training" role="tab" aria-selected="false" aria-controls="panel-training" tabindex="-1" data-tab="training" type="button">
+        <span class="step">2</span>
+        <span>Training</span>
+      </button>
+      <button class="create-tab" id="tab-preview" role="tab" aria-selected="false" aria-controls="panel-preview" tabindex="-1" data-tab="preview" type="button">
+        <span class="step">3</span>
+        <span>Local preview</span>
+      </button>
+      <button class="create-tab" id="tab-mint" role="tab" aria-selected="false" aria-controls="panel-mint" tabindex="-1" data-tab="mint" type="button">
+        <span class="step">4</span>
+        <span>Mint model NFT</span>
+      </button>
+        </div>
+      </aside>
+
+      <main class="createMain">
+
+    <!-- TAB: Dataset -->
+    <section class="panel tabPanel active" id="panel-dataset" role="tabpanel" aria-labelledby="tab-dataset" data-tab-panel="dataset">
+      <h2>Dataset</h2>
+      <label>Upload CSV</label>
+      <input id="csvFile" type="file" accept=".csv,text/csv" />
+      <div class="muted">For regression/binary/multiclass, choose one label (target) column. For multilabel, choose multiple label columns. Rows with missing / non-numeric <b>feature</b> values are dropped (and for multilabel, rows with invalid label values are dropped too).</div>
+
+      <div class="sep"></div>
+
+      <label>Task</label>
+      <select id="taskSel">
+        <option value="regression" selected>Regression</option>
+        <option value="binary_classification">Binary classification</option>
+        <option value="multiclass_classification">Multiclass classification</option>
+        <option value="multilabel_classification">Multilabel classification</option>
+      </select>
+      <div class="muted">
+        Regression predicts a number. Binary classification predicts the probability of the <b>positive</b> class.
+        Multiclass classification predicts one of the selected classes (argmax). Multilabel classification predicts an independent probability per label column.
+      </div>
+
+      <div class="sep"></div>
+
+      <div id="singleLabelRow">
+        <label>Label column</label>
+        <select id="labelCol"></select>
+
+        <div id="classBox" style="display:none; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border-light);">
+          <h3 style="margin-top: 0;">Classes</h3>
+          <div class="muted">Auto-detected from the label column. You can override if needed.</div>
+
+          <div style="margin-top: 12px;">
+            <label>Negative class (0)</label>
+            <select id="negClassSel"></select>
+          </div>
+          <div style="margin-top: 12px;">
+            <label>Positive class (1)</label>
+            <select id="posClassSel"></select>
+          </div>
+
+          <div class="row wrap" style="gap: 12px; margin-top: 12px;">
+            <button id="swapClassesBtn" class="btn small" type="button">Swap</button>
+            <span class="muted" id="classNote">—</span>
+          </div>
+        </div>
+
+        <div id="multiClassBox" style="display:none; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border-light);">
+          <h3 style="margin-top: 0;">Classes</h3>
+          <div class="muted">
+            Auto-detected from the label column. Select which labels to include and optionally reorder them.
+            The order defines class indices (0..K-1) stored on-chain in the NFT.
+          </div>
+
+          <div style="margin-top: 12px;">
+            <label>Class list</label>
+            <select id="multiClassSel" multiple size="8" style="width:100%; background: var(--bg-input); border: 1px solid var(--border-light); border-radius: 10px; padding: 10px;"></select>
+          </div>
+
+          <div class="row wrap" style="gap: 12px; margin-top: 12px;">
+            <button id="multiClassUpBtn" class="btn small" type="button">Up</button>
+            <button id="multiClassDownBtn" class="btn small" type="button">Down</button>
+            <button id="multiClassAllBtn" class="btn small" type="button">Select all</button>
+            <button id="multiClassClearBtn" class="btn small" type="button">Clear</button>
+            <span class="muted" id="multiClassNote">—</span>
+          </div>
+        </div>
+
+      </div>
+
+      <div id="multiLabelBox" style="display:none; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border-light);">
+        <h3 style="margin-top: 0;">Label columns</h3>
+        <div class="muted">
+          Select one column per label. Each label cell must be 0/1 or true/false, yes/no, t/f, y/n.
+          Rows with invalid/missing label values are dropped.
+        </div>
+
+        <div style="margin-top: 12px;">
+          <label>Label column list</label>
+          <select id="multiLabelSel" multiple size="8" style="width:100%; background: var(--bg-input); border: 1px solid var(--border-light); border-radius: 10px; padding: 10px;"></select>
+        </div>
+
+        <div class="row wrap" style="gap: 12px; margin-top: 12px;">
+          <button id="multiLabelAllBtn" class="btn small" type="button">Select all</button>
+          <button id="multiLabelClearBtn" class="btn small" type="button">Clear</button>
+          <span class="muted" id="multiLabelNote">—</span>
+        </div>
+      </div>
+
+      <details id="imbalanceDetails" class="detailsCard" style="display:none; margin-top: 14px;">
+        <summary>
+          <span>Class imbalance handling</span>
+          <span class="sumHint" id="imbSummaryHint">Optional</span>
+        </summary>
+
+        <div class="muted">
+          Helps when classes are imbalanced. Applies during training only (on-chain model format stays the same).
+          Auto mode uses balanced weights computed from the <b>training split</b>.
+        </div>
+
+        <div class="sep mini"></div>
+
+        <label>Mode</label>
+        <select id="imbMode">
+          <option value="none" selected>Off</option>
+          <option value="auto">Auto (balanced)</option>
+          <option value="manual">Manual</option>
+        </select>
+
+        <div class="row wrap" style="gap: 14px; align-items:center; margin-top: 12px;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span class="muted">Max weight</span>
+            <input id="imbCap" type="number" min="1" max="1000" step="1" value="20" style="width: 96px;" />
+          </div>
+
+          <label style="text-transform:none; letter-spacing:0; margin:0;">
+            <div class="checkRow">
+              <input id="imbNormalize" type="checkbox" checked />
+              <span class="muted">Normalize average weight to 1</span>
+            </div>
+          </label>
+
+          <label style="text-transform:none; letter-spacing:0; margin:0;">
+            <div class="checkRow">
+              <input id="imbStratify" type="checkbox" checked />
+              <span class="muted">Stratified split (binary/multiclass)</span>
+            </div>
+          </label>
+        </div>
+
+        <div id="imbNote" class="muted" style="margin-top: 10px;"></div>
+        <div id="imbRows" class="imbList" style="margin-top: 12px;"></div>
+      </details>
+
+      <div class="sep"></div>
+
+      <h3>Feature columns</h3>
+      <div class="muted">Toggle which columns are used as features (X). Selected label column(s) are excluded automatically.</div>
+      <div id="featureCols" class="feature-list"></div>
+
+      
+
+      <div class="sep"></div>
+
+      <div class="kv" id="dsKV"></div>
+      <div class="muted" id="dsNotes" style="margin-top: 12px;">Upload a CSV to begin.</div>
+
+      <div class="sep"></div>
+
+      <div id="ds3dDetails" class="detailsCard" style="margin-top: 0;">
+        <div class="row spread" style="align-items:center; gap: 12px;">
+          <h3 style="margin: 0;">3D Distribution</h3>
+          <span class="pill" id="ds3dHint">PCA</span>
+        </div>
+
+        <div class="muted" style="margin-top: 10px;">
+          Visualize your dataset in 3D. Default is a <b>PCA(3)</b> embedding over the currently selected feature columns.
+          Click a point to set the <b>dataset row index</b> for local preview.
+        </div>
+
+        <div class="sep mini"></div>
+
+        <div class="row wrap" style="gap: 14px; align-items:flex-end;">
+          <div style="min-width: 220px;">
+            <label style="margin-top: 0;">View mode</label>
+            <select id="ds3dMode">
+              <option value="pca" selected>PCA (3D embedding)</option>
+              <option value="scatter3">3-feature scatter</option>
+            </select>
+          </div>
+
+          <div style="min-width: 160px;">
+            <label style="margin-top: 0;">Sample size</label>
+            <input id="ds3dSample" type="number" min="500" max="10000" step="100" value="2000" />
+          </div>
+
+          <div style="min-width: 220px;">
+            <label style="margin-top: 0;">Color by</label>
+            <select id="ds3dColor"></select>
+          </div>
+        </div>
+
+        <div id="ds3dFeatureBox" style="display:none; margin-top: 12px;">
+          <div class="row wrap" style="gap: 14px; align-items:flex-end;">
+            <div style="min-width: 220px;">
+              <label style="margin-top: 0;">X</label>
+              <select id="ds3dX"></select>
+            </div>
+            <div style="min-width: 220px;">
+              <label style="margin-top: 0;">Y</label>
+              <select id="ds3dY"></select>
+            </div>
+            <div style="min-width: 220px;">
+              <label style="margin-top: 0;">Z</label>
+              <select id="ds3dZ"></select>
+            </div>
+          </div>
+          <div class="muted" style="margin-top: 6px;">
+            Tip: use <b>PCA</b> when you have many features; use <b>3-feature scatter</b> to inspect specific columns.
+          </div>
+        </div>
+
+        <div class="sep mini"></div>
+
+        <div style="border: 1px solid var(--border-light); border-radius: var(--radius); background: var(--bg-input); overflow: hidden;">
+          <div id="ds3dPlot" style="width: 100%; height: 430px;"></div>
+        </div>
+
+        <div class="muted" id="ds3dNote" style="margin-top: 10px;">Upload a CSV and select features to render.</div>
+      </div>
+
+      <div class="sep"></div>
+
+
+
+      <div class="tabActions">
+        <div></div>
+        <button class="btn primary" type="button" data-tab-jump="training">Next: Training →</button>
+      </div>
+    </section>
+
+    <!-- TAB: Training -->
+    <section class="panel tabPanel" id="panel-training" role="tabpanel" aria-labelledby="tab-training" data-tab-panel="training" hidden>
+      <h2>Training</h2>
+
+      <h3>Core hyperparameters</h3>
+      <label>Boosting rounds (trees)</label>
+      <input id="treesRange" type="range" min="25" max="600" step="25" value="250" />
+      <input id="treesNum" type="number" min="10" max="5000" step="10" value="250" />
+      <div class="muted">More boosting rounds can improve performance but increases on-chain size. For multiclass/multilabel this is <b>trees per class/label</b> (total trees = rounds × K).</div>
+
+      <label style="margin-top: 14px;">Depth</label>
+      <input id="depthRange" type="range" min="2" max="8" step="1" value="4" />
+      <input id="depthNum" type="number" min="1" max="12" step="1" value="4" />
+      <div class="muted">Deeper trees fit more complexity but grow exponentially in size.</div>
+
+      <label style="margin-top: 14px;">Learning rate</label>
+      <input id="lrRange" type="range" min="0.01" max="0.3" step="0.01" value="0.05" />
+      <input id="lrNum" type="number" min="0.001" max="1" step="0.001" value="0.05" />
+      <div class="muted">Lower = slower learning but often better generalization.</div>
+
+      <label style="margin-top: 14px;">Min leaf samples</label>
+      <input id="minLeafRange" type="range" min="1" max="50" step="1" value="10" />
+      <input id="minLeafNum" type="number" min="1" max="1000" step="1" value="10" />
+      <div class="muted">Higher = smoother model; lower = fits noise more easily.</div>
+
+      <label style="margin-top: 14px;">Split bins</label>
+      <input id="binsRange" type="range" min="8" max="256" step="8" value="32" />
+      <input id="binsNum" type="number" min="8" max="512" step="8" value="32" />
+      <div class="muted">More bins = more candidate split thresholds (slower training). Does not change on-chain model size.</div>
+
+      <label style="margin-top: 14px;">Binning method</label>
+      <select id="binningMode">
+        <option value="linear" selected>Linear (min/max)</option>
+        <option value="quantile">Quantile (equal-frequency)</option>
+      </select>
+      <div class="muted">Quantile binning often improves splits for skewed features (slower to compute; uses up to 50,000 train rows).</div>
+
+      <div class="sep"></div>
+
+      <h3 style="margin-top: 0;">Learning rate schedule (optional)</h3>
+      <label>Mode</label>
+      <select id="lrSchedMode">
+        <option value="none">None (constant)</option>
+        <option value="plateau">Reduce on plateau (−% after N rounds)</option>
+        <option value="piecewise">Piecewise (tree ranges)</option>
+      </select>
+      <div class="muted" style="margin-top: 6px;">
+        Schedules apply per boosting round. For multiclass/multilabel, each round trains <b>one tree per class/label</b> (so the schedule step affects all classes/labels in that round).
+      </div>
+
+      <div id="lrPlateauBox" style="display:none; margin-top: 12px;">
+        <label style="margin-top: 0;">Plateau patience (rounds)</label>
+        <input id="lrPlateauN" type="number" min="1" max="10000" step="1" value="25" />
+        <div class="muted">If validation metric does not improve for N rounds, reduce LR.</div>
+
+        <label style="margin-top: 12px;">Reduce LR by (%)</label>
+        <input id="lrPlateauPct" type="number" min="1" max="90" step="1" value="10" />
+        <div class="muted">Example: 10 means LR = LR × 0.9.</div>
+
+        <label style="margin-top: 12px;">Minimum LR</label>
+        <input id="lrPlateauMin" type="number" min="0" max="1" step="0.000001" value="0" />
+        <div class="muted">Optional floor to avoid LR becoming too small. Use 0 to disable.</div>
+      </div>
+
+      <div id="lrPiecewiseBox" style="display:none; margin-top: 12px;">
+        <label style="margin-top: 0;">Schedule</label>
+        <textarea id="lrScheduleText" rows="4" style="width:100%;" placeholder="1-100 0.1
+101-200 0.05
+201-250 0.001"></textarea>
+        <div class="row wrap" style="gap: 10px; align-items:center; margin-top: 8px;">
+          <button id="lrScheduleExampleBtn" class="btn2" type="button">Insert example</button>
+          <button id="lrScheduleClearBtn" class="btn2" type="button">Clear</button>
+          <span class="muted">Format: <code>start-end lr</code> per line (commas also accepted).</span>
+        </div>
+      </div>
+
+      <div class="sep"></div>
+
+      <h3 style="margin-top: 0;">Data split & early stopping</h3>
+
+      <label>Seed</label>
+      <input id="seedNum" type="number" value="42" />
+      <div class="muted">Controls train/val/test shuffle (based on your split %) and tie-breaking.</div>
+
+      <div style="margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border-light);">
+        <label>Dataset split (train / val / test)</label>
+        <div class="row wrap" style="gap: 12px; align-items: center;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <input id="trainSplitNum" type="number" min="50" max="90" step="1" value="70" style="width: 92px;" />
+            <span class="muted">Train %</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <input id="valSplitNum" type="number" min="5" max="40" step="1" value="20" style="width: 92px;" />
+            <span class="muted">Val %</span>
+          </div>
+          <span class="pill" id="testSplitPill">Test 10%</span>
+        </div>
+
+        <div style="margin-top: 10px;">
+          <label style="margin-top: 0;">Train %</label>
+          <input id="trainSplitRange" type="range" min="50" max="90" step="1" value="70" />
+        </div>
+        <div style="margin-top: 10px;">
+          <label style="margin-top: 0;">Val %</label>
+          <input id="valSplitRange" type="range" min="5" max="40" step="1" value="20" />
+        </div>
+        <div class="muted" id="splitNote">Default 70/20/10. Test set is never used for training (only evaluation).</div>
+        <div class="muted" id="splitCounts"></div>
+      </div>
+
+      <div style="margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border-light);">
+        <label>Early stopping</label>
+        <div class="checkRow">
+          <input id="earlyStopOn" type="checkbox" checked />
+          <span class="muted">Stop when validation metric stops improving (MSE for regression; LogLoss for classification)</span>
+        </div>
+
+        <label style="margin-top: 12px;">Patience (rounds)</label>
+        <input id="patienceRange" type="range" min="10" max="120" step="5" value="25" />
+        <input id="patienceNum" type="number" min="1" max="500" step="1" value="25" />
+        <div class="muted" id="patienceHelp">How many boosting rounds to wait for an improvement in the validation metric before stopping.</div>
+      </div>
+
+      <div style="margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border-light);">
+        <label>Final refit (optional)</label>
+        <div class="checkRow">
+          <input id="refitOn" type="checkbox" />
+          <span class="muted">After model selection, retrain on <b>Train+Val</b> for the chosen number of boosting rounds (keeps on-chain size the same).</span>
+        </div>
+      </div>
+
+      <div class="sep"></div>
+
+      <h3 style="margin-top: 0;">On-chain size estimate</h3>
+      <div class="kv" id="sizeKV"></div>
+      <div class="muted" id="sizeNote" style="margin-top: 12px;"></div>
+
+      <div class="sep"></div>
+
+
+      <div class="sep"></div>
+      <h3 style="margin-top: 0;">Training curve</h3>
+      <div id="curvePlot" class="chart" style="height:320px;"></div>
+      <div class="muted">Training metric over boosting rounds (MSE for regression; LogLoss for classification). For multiclass/multilabel, one round = one tree per class/label.</div>
+
+      <div class="sep"></div>
+
+      <h3 style="margin-top: 0;">Metrics</h3>
+      <div class="kv" id="metricsKV"></div>
+
+      <div class="sep"></div>
+
+      <details id="searchDetails" class="detailsCard" open>
+        <summary>
+          <span>Heuristic hyperparameter search</span>
+          <span class="sumHint">Optional</span>
+        </summary>
+
+      <div class="row wrap" style="gap: 14px; align-items: center;">
+        <label style="text-transform:none; letter-spacing:0; margin:0;">
+          <div class="checkRow">
+            <input id="heuristicSearchOn" type="checkbox" />
+            <span>Enable heuristic search (try multiple parameter sets)</span>
+          </div>
+        </label>
+
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span class="muted">Max rounds</span>
+          <input id="heuristicSearchRounds" type="number" min="1" max="1000" step="1" value="10" style="width: 92px;" />
+        </div>
+
+        <button id="heuristicSearchClearBtn" class="btn2" type="button">Clear table</button>
+      </div>
+      <div class="muted" style="margin-top: 6px;">
+        Runs N training rounds and picks the best validation score (lower is better). The best model will be kept for deployment.
+      </div>
+
+      <div class="fiTableWrap" style="margin-top: 12px;">
+        <table class="fiTable resp" id="searchTable"></table>
+      </div>
+      </details>
+
+      <div class="row wrap spread">
+        <span class="pill" id="trainPill">Idle</span>
+        <div class="row wrap" style="gap: 12px;">
+          <button class="btn primary" id="trainBtn">Train</button>
+          <button class="btn" id="stopBtn">Stop</button>
+        </div>
+      </div>
+      <div class="progress"><div id="trainBar"></div></div>
+
+      <div class="tabActions">
+        <button class="btn" type="button" data-tab-jump="dataset">← Back: Dataset</button>
+        <button class="btn primary" type="button" data-tab-jump="preview">Next: Local preview →</button>
+      </div>
+    </section>
+
+    <!-- TAB: Local preview -->
+    <section class="panel tabPanel" id="panel-preview" role="tabpanel" aria-labelledby="tab-preview" data-tab-panel="preview" hidden>
+      <h2>Local preview</h2>
+      <div class="muted" id="previewFeatHint">Train a model to enable.</div>
+
+      <div class="sep"></div>
+
+      <h3 style="margin-top: 0;">Training curve</h3>
+      <div id="previewCurvePlot" class="chart compact" style="height:320px;"></div>
+      <div class="muted">Same curve as Training tab (best round if heuristic search is enabled).</div>
+
+      <div class="sep"></div>
+
+      <h3 style="margin-top: 0;">Best model metrics</h3>
+      <div class="kv" id="previewMetricsKV"></div>
+
+      <div class="sep"></div>
+
+      <h3 style="margin-top: 0;">Best model hyperparameters</h3>
+      <div class="kv" id="previewParamsKV"></div>
+      <div class="muted" id="previewParamsNote" style="margin-top: 10px;">These are the exact settings used to train the current best model (after search/refit if enabled).</div>
+
+<div id="featImpBox" class="fiBox" style="display:none;">
+        <h3>Feature importance (post-train)</h3>
+        <div class="muted" id="featImpNote">Train a model to see feature importance.</div>
+        <div class="fiTableWrap" style="margin-top: 12px;">
+          <table class="fiTable resp" id="featImpTable"></table>
+        </div>
+      </div>
+
+      <div class="row wrap spread" style="margin-top: 14px; align-items: flex-end;">
+        <div style="flex:1; min-width: 240px;">
+          <label>Dataset row index (optional)</label>
+          <input id="rowIndex" type="number" min="0" step="1" placeholder="e.g. 0" />
+          <div class="muted">Load a dataset row into inputs, then predict and compare vs the real label.</div>
+        </div>
+        <div class="row wrap" style="gap: 12px; margin-left: auto;">
+          <button class="btn small" id="loadRowBtn" disabled>Load row</button>
+          <button class="btn small" id="compareRowBtn" disabled>Predict & compare</button>
+        </div>
+      </div>
+
+      <div id="previewFeatGrid" class="featGrid" style="margin-top: 14px;"></div>
+      <div class="row" style="margin-top: 16px;">
+        <button class="btn primary" id="previewBtn" disabled>Predict locally</button>
+      </div>
+      <div class="sep"></div>
+      <div class="kv" id="previewKV"></div>
+
+      <div class="tabActions">
+        <button class="btn" type="button" data-tab-jump="training">← Back: Training</button>
+        <button class="btn primary" type="button" data-tab-jump="mint">Next: Mint →</button>
+      </div>
+    </section>
+
+    <!-- TAB: Mint -->
+    <section class="panel tabPanel" id="panel-mint" role="tabpanel" aria-labelledby="tab-mint" data-tab-panel="mint" hidden>
+      <h2>Mint Model NFT</h2>
+
+      <h3>Metadata (required)</h3>
+      <label>Model name</label>
+      <input id="metaName" placeholder="e.g. NHANES Age Predictor" />
+
+      <label style="margin-top: 12px;">Short description</label>
+      <textarea id="metaDesc" rows="4" placeholder="What does it predict? What dataset? Which features?"></textarea>
+
+      <label style="margin-top: 12px;">128×128 PNG icon</label>
+      <input id="iconFile" type="file" accept="image/png" />
+      <div class="muted">Stored fully on-chain inside the NFT. Must be exactly 128×128 px.</div>
+
+      <div class="sep"></div>
+
+      <h3>Owner API access key (no wallet)</h3>
+      <div class="muted">
+        This suite grants a <b>perpetual on-chain access key</b> to the model owner at mint time.
+        Save the private key now — it <b>cannot</b> be recovered later.
+      </div>
+
+      <div class="row wrap" style="align-items:flex-end; margin-top: 12px;">
+        <div style="flex:1; min-width: 240px;">
+          <label>Key address</label>
+          <input id="ownerKeyAddr" placeholder="0x…" readonly />
+        </div>
+        <div style="flex:1; min-width: 240px;">
+          <label>Private key (save it)</label>
+          <input id="ownerKeyPriv" type="password" placeholder="0x…" />
+        </div>
+        <button id="genOwnerKeyBtn" class="btn small" type="button">Generate</button>
+        <button id="copyOwnerKeyBtn" class="btn small" type="button">Copy</button>
+        <button id="downloadOwnerKeyBtn" class="btn small" type="button">Download</button>
+      </div>
+
+      <div class="checkRow" style="margin-top: 10px;">
+        <input id="ownerKeySaved" type="checkbox" />
+        <div>
+          <div><b>I saved this private key</b></div>
+          <div class="muted">Needed for the read-only API key inference system.</div>
+        </div>
+      </div>
+
+      <div class="sep"></div>
+
+      <h3>Inference pricing (owner-controlled)</h3>
+      <label>Mode</label>
+      <select id="pricingMode">
+        <option value="0">Free</option>
+        <option value="1">Tips (optional)</option>
+        <option value="2">Paid required</option>
+      </select>
+
+      <label style="margin-top: 12px;">Fee (L1)</label>
+      <input id="pricingFee" type="number" step="0.001" value="0.001" />
+      <div class="muted">UI clamps 0.001–1 L1 for sanity (you can change later as owner).</div>
+
+      <label style="margin-top: 12px;">Fee recipient (optional)</label>
+      <input id="pricingRecipient" placeholder="0x… (defaults to you)" />
+
+      <div class="sep"></div>
+
+      <h3>Legal (required)</h3>
+      <div class="muted" id="licenseLine">Loading license…</div>
+      <div class="muted" id="tosLine" style="margin-top: 6px;">Loading terms…</div>
+
+      <div class="sep"></div>
+
+      <label style="text-transform:none; letter-spacing:0; margin-bottom: 0;">
+        <div class="checkRow">
+          <input type="checkbox" id="agreeTos" />
+          <span>I agree to the current on-chain Terms (see <a href="./terms.html" style="color: var(--primary); text-decoration:none;">Terms</a>).</span>
+        </div>
+      </label>
+
+      <label style="text-transform:none; letter-spacing:0; margin-top: 10px; margin-bottom:0;">
+        <div class="checkRow">
+          <input type="checkbox" id="agreeLicense" />
+          <span>I acknowledge my Model NFT and its metadata are licensed under the active Creative Commons license (copy/adapt/remix allowed).</span>
+        </div>
+      </label>
+
+      <div class="sep"></div>
+
+      <h3>Deploy</h3>
+
+      <div class="kv" id="deployEstKV"></div>
+      <div class="muted" id="deployEstNote" style="margin-top: 12px;">
+        Train a model to see deploy estimate (transactions + on-chain deploy value).
+      </div>
+
+      <div class="row wrap spread" style="margin-top: 14px;">
+        <span class="pill" id="deployPill">Need: connect wallet, train model, generate+save owner key, name + description, 128×128 icon, accept Terms + License</span>
+        <button class="btn primary" id="deployBtn" disabled>Deploy Model NFT</button>
+      </div>
+
+      <div class="sep"></div>
+      <pre class="log" id="deployLog" style="height: 260px;"></pre>
+
+      <div class="tabActions">
+        <button class="btn" type="button" data-tab-jump="preview">← Back: Local preview</button>
+        <div></div>
+      </div>
+    </section>
+
+      </main>
+    </div>
+
+  </div>
+
+  <!-- Debug dock -->
+  <div id="debugDock" class="debug-dock">
+    <div class="debug-head">
+      <div class="left">
+        <span class="debug-badge">Debug</span>
+        <span id="dbgState">idle</span>
+        <span id="dbgConn" class="debug-badge" style="font-weight:650;">not connected</span>
+      </div>
+      <div class="right" style="display:flex; gap:6px; flex-wrap:wrap;">
+        <button id="dbgCollapse" class="dbg-btn" type="button">Collapse</button>
+        <button id="dbgCopy" class="dbg-btn" type="button">Copy</button>
+        <button id="dbgClear" class="dbg-btn" type="button">Clear</button>
+      </div>
+    </div>
+    <pre id="debugLines" class="debug-lines"></pre>
+  </div>
+  <div id="debugFab" class="debug-fab" hidden title="Show debug">🐞</div>
+
+  <script type="module" src="./src/create_page.js"></script>
+
+  <script>
+    (() => {
+      const topbar = document.querySelector(".topbar");
+      const toggle = document.querySelector(".navToggle");
+      const nav = document.getElementById("siteNav");
+      if (!topbar || !toggle || !nav) return;
+
+      const setOpen = (open) => {
+        topbar.classList.toggle("menu-open", open);
+        toggle.setAttribute("aria-expanded", open ? "true" : "false");
+      };
+
+      toggle.addEventListener("click", (e) => {
+        e.preventDefault();
+        setOpen(!topbar.classList.contains("menu-open"));
+      });
+
+      // Close when a link is selected (best for mobile)
+      nav.addEventListener("click", (e) => {
+        if (e.target.closest("a")) setOpen(false);
+      });
+
+      // Close when clicking outside the topbar
+      document.addEventListener("click", (e) => {
+        if (!topbar.contains(e.target) && topbar.classList.contains("menu-open")) setOpen(false);
+      });
+
+      // Close on Escape
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") setOpen(false);
+      });
+
+      // Reset when returning to desktop
+      window.addEventListener("resize", () => {
+        if (window.innerWidth > 860) setOpen(false);
+      });
+    })();
+  </script>
+
+</body>
+</html>
