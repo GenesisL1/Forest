@@ -25,11 +25,11 @@ SOFTWARE.
 
 import { setupNav } from "./ui_nav.js";
 import { setupDebugDock } from "./debug_dock.js";
-import {makeLogger, loadSystem, mustAddr, nowTs, clamp, ethToWei, weiToEth, packNftFeatures, sigmoid, taskLabel} from "./common.js";
+import {makeLogger, loadSystem, mustAddr, nowTs, clamp, ethToWei, weiToEth, packNftFeatures, unpackNftFeatures, sigmoid, taskLabel} from "./common.js";
 import { getReadProvider, getSignerProvider, getWalletState } from "./eth.js";
 import { parseCSV, toNumericMatrix, inferLabelValues, toBinaryMatrix, toMulticlassMatrix, toMultilabelMatrix } from "./csv_parse.js";
 import { estimateModelBytes, estimateModelBytesV2 } from "./train_gbdt.js";
-import { decodeModel, predictQ, predictClassQ, predictMultiQ } from "./local_infer.js";
+import { decodeModel, predictQ, predictClassQ, predictMultiQ, parseGl1fPackage, attachGl1xFooter } from "./local_infer.js";
 import { ABI_STORE, ABI_REGISTRY } from "./abis.js";
 
 const ethers = globalThis.ethers;
@@ -37,7 +37,253 @@ const ethers = globalThis.ethers;
 const SIZE_LIMIT = 15_000_000;
 const CHUNK_SIZE = 24000;
 const DEFAULT_SCALE_Q = 1_000_000;
-const INT32_SAFE = 2_147_480_000; // headroom vs 2,147,483,647
+const INT32_SAFE = 2_147_480_000; 
+const SEARCH_PAGE_SIZE = 25;
+const PY_UI_SAMPLE_ROWS = 2048;
+
+
+// ===== Python (local trainer) bridge =====
+// Browser cannot directly launch Python. In "Python engine" mode we call a localhost server:
+//   python3 local_trainer_server.py --port 8787
+// The server caches the dataset (upload once) and trains via train_gl1f.py, returning .gl1f bytes.
+//
+// IMPORTANT: This file is an ES module. We must not touch DOM elements before they exist.
+// We therefore bind the bridge to elements inside init() after all getElementById calls.
+
+let trainEngineSel = null;
+let pythonApiUrl = null;
+let pyDatasetPill = null;
+let pyUploadBtn = null;
+
+let pyDatasetId = null;
+let pyDatasetName = null;
+let pyUploading = false;
+let pyTrainAbort = null;
+
+function bindPythonBridgeUI() {
+  trainEngineSel = document.getElementById("trainEngineSel");
+  pythonApiUrl = document.getElementById("pythonApiUrl");
+  pyDatasetPill = document.getElementById("pyDatasetPill");
+  pyUploadBtn = document.getElementById("pyUploadBtn");
+
+  // Default pill
+  try { _setPyDatasetPill("Dataset: not cached"); } catch {}
+
+  if (trainEngineSel) {
+    trainEngineSel.addEventListener("change", () => {
+      if (_isPythonEngine()) {
+        // keep current pill
+      } else {
+        // leaving python mode: don't assume cache is valid for current CSV
+        pyDatasetId = null;
+        pyDatasetName = null;
+        try { _setPyDatasetPill("Dataset: not cached"); } catch {}
+      }
+    });
+  }
+}
+
+function _isPythonEngine() {
+  const v = String(trainEngineSel?.value || "browser");
+  return v === "python" || v === "cpp";
+}
+
+function _localEngineName() {
+  const v = String(trainEngineSel?.value || "python");
+  return v === "cpp" ? "C++" : "Python";
+}
+
+function _pythonBase() {
+  const raw = String(pythonApiUrl?.value || "http://127.0.0.1:8787").trim();
+  return raw.replace(/\/+$/, "");
+}
+
+function _setPyDatasetPill(text, cls = "") {
+  if (!pyDatasetPill) return;
+  pyDatasetPill.textContent = text;
+  pyDatasetPill.classList.remove("ok", "warn", "bad");
+  if (cls) pyDatasetPill.classList.add(cls);
+}
+
+async function _pyPing() {
+  const base = _pythonBase();
+  const r = await fetch(`${base}/api/ping`, { method: "GET" });
+  if (!r.ok) throw new Error(`Local trainer API ping failed (${r.status})`);
+  const j = await r.json();
+  // If server reports C++ availability, reflect it in the UI option.
+  if (j && typeof j.supportsCpp === "boolean") {
+    const optCpp = trainEngineSel?.querySelector('option[value="cpp"]');
+    if (optCpp) {
+      optCpp.disabled = !j.supportsCpp;
+      if (!j.supportsCpp && trainEngineSel.value === "cpp") {
+        trainEngineSel.value = "python";
+      }
+    }
+  }
+  return j;
+}
+
+async function _pyUploadDatasetFile(file) {
+  if (!file) throw new Error("Select a CSV file first (Dataset tab)");
+  if (pyUploading) throw new Error("Upload already in progress");
+  pyUploading = true;
+  try {
+    await _pyPing();
+    const base = _pythonBase();
+    _setPyDatasetPill("Dataset: uploading…", "warn");
+    if (pyUploadBtn) pyUploadBtn.disabled = true;
+
+    const url = `${base}/api/upload?filename=${encodeURIComponent(file.name || "dataset.csv")}`;
+    const resp = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/octet-stream" },
+      body: file
+    });
+    if (!resp.ok) {
+      const t = await resp.text().catch(() => "");
+      throw new Error(`Upload failed (${resp.status}): ${t || resp.statusText}`);
+    }
+    const out = await resp.json();
+    if (!out || !out.ok || !out.datasetId) throw new Error("Upload failed: bad response");
+    pyDatasetId = String(out.datasetId);
+    pyDatasetName = String(out.filename || file.name || "dataset.csv");
+    _setPyDatasetPill(`Dataset cached: ${pyDatasetName}`, "ok");
+    return pyDatasetId;
+  } finally {
+    pyUploading = false;
+    if (pyUploadBtn) pyUploadBtn.disabled = false;
+  }
+}
+
+function _b64ToU8(b64) {
+  const bin = atob(String(b64 || ""));
+  const u8 = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i) & 255;
+  return u8;
+}
+
+// Top-level helper: used by the Python-engine bridge (which runs outside init()).
+// NOTE: There is also an identical helper inside init() for legacy code paths;
+// keeping this one prevents ReferenceError when Python-engine is selected.
+function _maybeDeepCopy(x) {
+  if (x == null) return null;
+  try { return JSON.parse(JSON.stringify(x)); } catch { return x; }
+}
+
+  function _sliceParsedRowsForUI(p, maxRows = PY_UI_SAMPLE_ROWS) {
+    if (!p || !Array.isArray(p.rows)) return p;
+    if (p.rows.length <= maxRows) return p;
+    return { ...p, rows: p.rows.slice(0, maxRows) };
+  }
+
+async function runTrainRoundPython({ params, round, totalRounds, labelPrefix, parsed, selectedFeatures, selectedTask, selectedLabel, selectedLabelCols, selectedNegLabel, selectedPosLabel, selectedMultiLabels, curve, trainPill, trainBar, setDockState, nowTs, log }) {
+  const base = _pythonBase();
+  await _pyPing();
+
+  if (!pyDatasetId) {
+    const f = document.getElementById("csvFile")?.files?.[0];
+    await _pyUploadDatasetFile(f);
+  }
+  if (!pyDatasetId) throw new Error("Dataset not cached (upload failed)");
+  const localCurve = { steps: [], train: [], val: [], test: [], bestVal: [] };
+  // NOTE: Do not clear global Plotly curves here. The caller decides when to clear.
+  // During heuristic search we keep the previous curve visible until this round completes.
+
+  const labelTxt = labelPrefix || ((totalRounds > 1) ? `Search ${round}/${totalRounds}` : "Training");
+  trainPill.textContent = `${labelTxt}…`;
+  setDockState("training");
+
+  const ac = new AbortController();
+  pyTrainAbort = ac;
+
+  const overall = (totalRounds > 1) ? ((round - 1) / totalRounds) : 0;
+  trainBar.style.width = `${Math.max(0, Math.min(100, Math.floor(overall * 100)))}%`;
+
+  const headers = parsed?.headers || [];
+  const featureCols = (selectedFeatures || []).map((i) => headers[i] || `col${i}`);
+  const task = params.task || selectedTask;
+
+  let labelCol = null;
+  let labelCols = null;
+  let negLabel = null;
+  let posLabel = null;
+  let classLabels = null;
+
+  if (task === "multilabel_classification") {
+    const cols = Array.isArray(selectedLabelCols) ? selectedLabelCols.slice() : [];
+    labelCols = cols.map((i, k) => headers[i] || `label${k}`);
+  } else {
+    const idx = Number(selectedLabel);
+    labelCol = headers[idx] || `label`;
+  }
+
+  if (task === "binary_classification") {
+    negLabel = String(selectedNegLabel || "");
+    posLabel = String(selectedPosLabel || "");
+  } else if (task === "multiclass_classification") {
+    classLabels = Array.isArray(selectedMultiLabels) ? selectedMultiLabels.map(String) : [];
+  }
+
+  const req = {
+    task,
+    engine: String(trainEngineSel?.value || "python"),
+    datasetId: pyDatasetId,
+    featureCols,
+    labelCol,
+    labelCols,
+    negLabel,
+    posLabel,
+    classLabels,
+    params: { ...params, scaleQ: "auto" }
+  };
+
+  const resp = await fetch(`${base}/api/train`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req),
+    signal: ac.signal
+  }).catch((e) => {
+    if (ac.signal.aborted) throw new Error("Stopped");
+    throw e;
+  });
+
+  if (!resp.ok) {
+    const t = await resp.text().catch(() => "");
+    throw new Error(`Local training failed (${resp.status}): ${t || resp.statusText}`);
+  }
+  const out = await resp.json();
+  if (!out || !out.ok) throw new Error(out?.error || "Local training failed");
+
+  const meta = out.meta || {};
+  const c = out.curve || {};
+  localCurve.steps = Array.isArray(c.steps) ? c.steps.slice() : [];
+  localCurve.train = Array.isArray(c.train) ? c.train.slice() : [];
+  localCurve.val = Array.isArray(c.val) ? c.val.slice() : [];
+  localCurve.test = Array.isArray(c.test) ? c.test.slice() : [];
+  localCurve.bestVal = Array.isArray(c.bestVal) ? c.bestVal.slice() : [];
+
+  curve.steps = localCurve.steps;
+  curve.train = localCurve.train;
+  curve.val = localCurve.val;
+  curve.test = localCurve.test;
+  curve.bestVal = localCurve.bestVal;
+
+  const overallDone = (totalRounds > 1) ? (round / totalRounds) : 1;
+  trainBar.style.width = `${Math.max(0, Math.min(100, Math.floor(overallDone * 100)))}%`;
+  trainPill.textContent = `${labelTxt} done`;
+
+  pyTrainAbort = null;
+
+  const bytes = _b64ToU8(out.modelBytesB64 || "");
+  return { bytes, meta, curve: localCurve, params: _maybeDeepCopy(params) };
+}
+
+async function _pyStop() {
+  try {
+    const base = _pythonBase();
+    await fetch(`${base}/api/stop`, { method: "POST" }).catch(() => {});
+  } catch {}
+}
 
 function chooseScaleQ(task, maxAbsX, maxAbsY) {
   // Keep scaleQ high for precision, but clamp so quantized int32 values won't overflow.
@@ -410,12 +656,21 @@ document.addEventListener("DOMContentLoaded", async () => {
   const metricsKV = document.getElementById("metricsKV");
   const trainBtn = document.getElementById("trainBtn");
   const stopBtn = document.getElementById("stopBtn");
+
+  // Bind Python training engine UI (safe: after DOM element lookups)
+  try { bindPythonBridgeUI(); } catch {}
+
   // Heuristic search (optional)
   const searchDetails = document.getElementById("searchDetails");
   const heuristicSearchOn = document.getElementById("heuristicSearchOn");
   const heuristicSearchRounds = document.getElementById("heuristicSearchRounds");
   const heuristicSearchClearBtn = document.getElementById("heuristicSearchClearBtn");
   const searchTable = document.getElementById("searchTable");
+  // Search table pagination (25 rows/page)
+  const searchPager = document.getElementById("searchPager");
+  const searchPrevBtn = document.getElementById("searchPrevBtn");
+  const searchNextBtn = document.getElementById("searchNextBtn");
+  const searchPageInfo = document.getElementById("searchPageInfo");
   // Stop is only meaningful while training is running.
   stopBtn.disabled = true;
   const trainPill = document.getElementById("trainPill");
@@ -595,6 +850,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   const previewParamsKV = document.getElementById("previewParamsKV");
   const previewParamsNote = document.getElementById("previewParamsNote");
 
+  // Local preview: save/load .gl1f package
+  const exportGl1fBtn = document.getElementById("exportGl1fBtn");
+  const importGl1fFile = document.getElementById("importGl1fFile");
+  const gl1fPill = document.getElementById("gl1fPill");
+
   // Deploy elements
   const metaName = document.getElementById("metaName");
   const metaDesc = document.getElementById("metaDesc");
@@ -662,6 +922,47 @@ function _downloadTextFile(filename, text) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+function _downloadBytesFile(filename, bytesU8) {
+  const u8 = (bytesU8 instanceof Uint8Array) ? bytesU8 : new Uint8Array(bytesU8);
+  const blob = new Blob([u8], { type: 'application/octet-stream' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function _bytesToBase64(bytesU8) {
+  const u8 = (bytesU8 instanceof Uint8Array) ? bytesU8 : new Uint8Array(bytesU8);
+  let bin = "";
+  const CH = 0x8000;
+  for (let i = 0; i < u8.length; i += CH) {
+    bin += String.fromCharCode(...u8.subarray(i, i + CH));
+  }
+  return btoa(bin);
+}
+
+function _base64ToBytes(b64) {
+  const bin = atob(String(b64 || ""));
+  const u8 = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+  return u8;
+}
+
+function _safeSlug(s) {
+  return String(s || "model")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\-_]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 64) || "model";
+}
+
+
 if (copyOwnerKeyBtn) copyOwnerKeyBtn.addEventListener('click', async () => {
   const t = (ownerKeyPriv?.value || '').trim();
   if (!t) return;
@@ -727,6 +1028,12 @@ if (ownerKeyAddr && !ownerKeyAddr.value) {
   let datasetNumeric = null;
   let trained = null; // {bytes, decoded, modelId, meta}
 
+  // Local preview save/load (.gl1f) state
+  let _gl1fLoadedName = null;
+  let _gl1fLoadedHasFooter = false;
+  let _gl1fLoadedPkg = null;
+
+
   // Keep the exact train parameters we used so we can compute post-train
   // feature importance (including test-split permutation importance) consistently.
   let lastTrainInfo = null; // {task, seed, splitTrain, splitVal, nRows, nFeatures, nClasses}
@@ -741,6 +1048,7 @@ if (ownerKeyAddr && !ownerKeyAddr.value) {
   let isSearching = false;
   let searchAbort = false;
   let searchHistory = []; // [{round,status,params,meta,curve,error}]
+  let searchPage = 1; // 1-indexed page for heuristic search table
   let _activeTrainReject = null;
   let iconBytes = null;
 
@@ -756,6 +1064,275 @@ if (ownerKeyAddr && !ownerKeyAddr.value) {
   let _ds3dNonce = 0;
   let _ds3dLastKey = "";
   let _ds3dLastSample = null; // cached sample to avoid rescanning on pure UI-only changes
+
+
+  // ---- Local preview .gl1f save/load ----
+
+  function updateGl1fUI() {
+    try {
+      if (exportGl1fBtn) exportGl1fBtn.disabled = !(trained?.bytes?.length);
+    } catch {}
+    try {
+      if (!gl1fPill) return;
+      if (_gl1fLoadedName) {
+        gl1fPill.textContent = `Loaded: ${_gl1fLoadedName}${_gl1fLoadedHasFooter ? "" : " (no meta)"}`;
+      } else if (trained?.bytes?.length) {
+        gl1fPill.textContent = "Model file: in memory";
+      } else {
+        gl1fPill.textContent = "Model file: none";
+      }
+    } catch {}
+  }
+
+  function _buildFeaturesPackedForCurrentModel(task) {
+    const t = String(task || selectedTask || "regression");
+    const featureNames = datasetNumeric?.featureNames || [];
+    let labelName = datasetNumeric?.labelName || "";
+    let labels = null;
+    let labelNames = null;
+
+    if (t === "binary_classification") {
+      const c = datasetNumeric?.classes || {};
+      const a0 = (c && (c[0] != null)) ? String(c[0]) : String(selectedNegLabel || "0");
+      const a1 = (c && (c[1] != null)) ? String(c[1]) : String(selectedPosLabel || "1");
+      labels = [a0, a1];
+      if (!labelName) labelName = "(binary)";
+    } else if (t === "multiclass_classification") {
+      const arr = Array.isArray(datasetNumeric?.classes) ? datasetNumeric.classes : (Array.isArray(selectedMultiLabels) ? selectedMultiLabels : []);
+      labels = arr && arr.length ? arr.map((x)=>String(x)) : null;
+      if (!labelName) labelName = "(multiclass)";
+    } else if (t === "multilabel_classification") {
+      labelNames = Array.isArray(datasetNumeric?.labelNames) ? datasetNumeric.labelNames.map((x)=>String(x)) : null;
+      labels = ["0","1"];
+      labelName = "(multilabel)";
+    }
+
+    return packNftFeatures({ task: t, featureNames, labelName, labels, labelNames });
+  }
+
+  function _buildGl1fExportPackage() {
+    if (!trained?.bytes?.length) throw new Error("Train or load a model first");
+
+    const task = String(trained?.meta?.task || selectedTask || "regression");
+    const title = (metaName?.value || "").trim();
+    const description = (metaDesc?.value || "").trim();
+
+    const featuresPacked = _buildFeaturesPackedForCurrentModel(task);
+    const words = title ? titleWordHashes(title) : [];
+
+    let mode = 0;
+    let feeWeiStr = "0";
+    try {
+      mode = Number(pricingMode?.value || 0);
+      if (mode === 0) feeWeiStr = "0";
+      else feeWeiStr = String(ethToWei(String(pricingFee?.value || "0")));
+    } catch {}
+
+    const recipient = String(pricingRecipient?.value || "").trim();
+    const ownerKey = String(ownerKeyAddr?.value || "").trim();
+
+    const pkg = {
+      kind: "GL1F_PACKAGE",
+      v: 1,
+      createdAt: new Date().toISOString(),
+      chainId: 29,
+      chunkSize: CHUNK_SIZE,
+      model: {
+        gl1fVersion: Number(trained?.decoded?.version || 1),
+        nFeatures: Number(trained?.decoded?.nFeatures || 0),
+        depth: Number(trained?.decoded?.depth || 0),
+        scaleQ: Number(trained?.decoded?.scaleQ || 0),
+        bytes: Number(trained?.bytes?.length || 0),
+      },
+      nft: {
+        title,
+        description,
+        iconPngB64: iconBytes?.length ? _bytesToBase64(iconBytes) : null,
+        featuresPacked,
+        titleWordHashes: words,
+      },
+      registry: {
+        pricingMode: mode,
+        feeWei: feeWeiStr,
+        recipient,
+        ownerKey,
+        tosVersionAccepted: Number(activeTosVersion || 0),
+        licenseIdAccepted: Number(activeLicenseId || 0),
+      },
+      local: {
+        trainMeta: trained?.meta || null,
+        trainParams: trained?.params || null,
+        curve: {
+          steps: Array.isArray(curve.steps) ? curve.steps.slice() : [],
+          train: Array.isArray(curve.train) ? curve.train.slice() : [],
+          val: Array.isArray(curve.val) ? curve.val.slice() : [],
+          test: Array.isArray(curve.test) ? curve.test.slice() : [],
+          bestVal: Array.isArray(curve.bestVal) ? curve.bestVal.slice() : [],
+        },
+      }
+    };
+
+    // IMPORTANT: attach footer, but keep trained.bytes core-only (deploy stays identical)
+    const outBytes = attachGl1xFooter(trained.bytes, pkg);
+    return { pkg, outBytes };
+  }
+
+  async function _loadGl1fFile(file) {
+    const u8 = new Uint8Array(await file.arrayBuffer());
+    const { modelBytes, pkg, hasFooter } = parseGl1fPackage(u8);
+
+    // Parse featuresPacked if present (this is what makes mint+preview work without CSV)
+    let fpMeta = null;
+    let fpFeatures = null;
+    try {
+      const fpRaw = (pkg && pkg.nft && typeof pkg.nft.featuresPacked === "string") ? pkg.nft.featuresPacked : "";
+      if (fpRaw) {
+        const u = unpackNftFeatures(fpRaw);
+        fpMeta = u.meta;
+        fpFeatures = u.features;
+      }
+    } catch {}
+
+    const decoded = decodeModel(modelBytes);
+
+    // Decide task
+    let task = (pkg && pkg.local && pkg.local.trainMeta && typeof pkg.local.trainMeta.task === "string") ? pkg.local.trainMeta.task : null;
+    if (!task && fpMeta && typeof fpMeta.task === "string") task = fpMeta.task;
+    if (!task) task = (decoded.version === 2) ? "multiclass_classification" : (selectedTask || "regression");
+    task = String(task || "regression");
+
+    // Feature names
+    let featureNames = [];
+    if (Array.isArray(fpFeatures) && fpFeatures.length) featureNames = fpFeatures.map(String);
+
+    if (!featureNames.length) {
+      featureNames = Array.from({ length: Number(decoded.nFeatures || 0) }, (_, i) => `f${i}`);
+    } else if (featureNames.length !== Number(decoded.nFeatures || 0)) {
+      const n = Number(decoded.nFeatures || 0);
+      featureNames = featureNames.slice(0, n);
+      while (featureNames.length < n) featureNames.push(`f${featureNames.length}`);
+    }
+
+    // Labels/classes
+    let labelName = (fpMeta && typeof fpMeta.labelName === "string") ? fpMeta.labelName : "label";
+    let classes = null;
+    let labelNames = null;
+
+    if (task === "binary_classification") {
+      const labs = (fpMeta && Array.isArray(fpMeta.labels) && fpMeta.labels.length >= 2) ? fpMeta.labels : ["0","1"];
+      classes = { 0: String(labs[0]), 1: String(labs[1]) };
+      selectedNegLabel = String(labs[0]);
+      selectedPosLabel = String(labs[1]);
+    } else if (task === "multiclass_classification") {
+      const labs = (fpMeta && Array.isArray(fpMeta.labels) && fpMeta.labels.length >= 2) ? fpMeta.labels : Array.from({ length: Number(decoded.nClasses || 2) }, (_, i) => String(i));
+      classes = labs.map(String);
+      selectedMultiLabels = classes.slice();
+    } else if (task === "multilabel_classification") {
+      labelNames = (fpMeta && Array.isArray(fpMeta.labelNames) && fpMeta.labelNames.length >= 1) ? fpMeta.labelNames.map(String) : [];
+      const n = Number(decoded.nClasses || labelNames.length || 2);
+      labelNames = labelNames.slice(0, n);
+      while (labelNames.length < n) labelNames.push(`label${labelNames.length}`);
+      labelName = "(multilabel)";
+      classes = { 0: "0", 1: "1" };
+    }
+
+    // Minimal dataset for preview+mint (no raw rows)
+    datasetNumeric = {
+      featureNames,
+      X: [],
+      y: [],
+      droppedRows: 0,
+      labelName,
+      labelNames,
+      classes,
+    };
+
+    selectedTask = task;
+    selectedFeatures = Array.from({ length: featureNames.length }, (_, i) => i);
+    labelValuesInfo = null;
+
+    // Restore curve (if present), else blank
+    const c = (pkg && pkg.local && pkg.local.curve && typeof pkg.local.curve === "object") ? pkg.local.curve : null;
+    if (c && Array.isArray(c.steps)) {
+      curve.steps = c.steps.slice();
+      curve.train = Array.isArray(c.train) ? c.train.slice() : [];
+      curve.val = Array.isArray(c.val) ? c.val.slice() : [];
+      curve.test = Array.isArray(c.test) ? c.test.slice() : [];
+      curve.bestVal = Array.isArray(c.bestVal) ? c.bestVal.slice() : [];
+      _curveRev++;
+      drawCurves();
+    } else {
+      resetCurve();
+    }
+
+    // Restore mint fields (best-effort)
+    try {
+      if (pkg && pkg.nft) {
+        if (metaName && typeof pkg.nft.title === "string") metaName.value = pkg.nft.title;
+        if (metaDesc && typeof pkg.nft.description === "string") metaDesc.value = pkg.nft.description;
+        if (pkg.nft.iconPngB64) {
+          try { iconBytes = _base64ToBytes(pkg.nft.iconPngB64); } catch {}
+        }
+      }
+    } catch {}
+
+    try {
+      if (pkg && pkg.registry) {
+        if (pricingMode && pkg.registry.pricingMode != null) pricingMode.value = String(pkg.registry.pricingMode);
+        if (pricingRecipient && typeof pkg.registry.recipient === "string") pricingRecipient.value = pkg.registry.recipient;
+        if (pricingFee && pkg.registry.feeWei != null) {
+          try { pricingFee.value = weiToEth(BigInt(String(pkg.registry.feeWei || "0"))); } catch {}
+        }
+        if (ownerKeyAddr && typeof pkg.registry.ownerKey === "string" && pkg.registry.ownerKey.trim()) ownerKeyAddr.value = pkg.registry.ownerKey.trim();
+        if (ownerKeySaved) ownerKeySaved.checked = false;
+      }
+    } catch {}
+
+    const meta = (pkg && pkg.local && pkg.local.trainMeta && typeof pkg.local.trainMeta === "object") ? pkg.local.trainMeta : { task };
+    const params = (pkg && pkg.local && pkg.local.trainParams && typeof pkg.local.trainParams === "object") ? pkg.local.trainParams : null;
+
+    // IMPORTANT: load core bytes only → deploy is identical to trained
+    applyTrainedModel({ bytes: modelBytes, meta, params });
+
+    try { applyParamsToTrainingUI(params); } catch {}
+    try { updateTaskUI(); } catch {}
+    try { updateSize(); } catch {}
+    try { renderPreviewInputs(); } catch {}
+    try { updateDeployState(); } catch {}
+
+    _gl1fLoadedName = file.name;
+    _gl1fLoadedHasFooter = !!hasFooter && !!pkg;
+    _gl1fLoadedPkg = pkg;
+    updateGl1fUI();
+
+    log(`[${nowTs()}] Loaded .gl1f: ${file.name} (${u8.length.toLocaleString()} bytes; model ${modelBytes.length.toLocaleString()} bytes; task=${task})`);
+  }
+
+  if (exportGl1fBtn) exportGl1fBtn.addEventListener("click", () => {
+    try {
+      const { outBytes } = _buildGl1fExportPackage();
+      const title = (metaName?.value || "").trim();
+      const ts = new Date().toISOString().replace(/[:.]/g, "-");
+      const fname = `forest-${_safeSlug(title)}-${ts}.gl1f`;
+      _downloadBytesFile(fname, outBytes);
+      log(`[${nowTs()}] Exported .gl1f package: ${fname} (${outBytes.length.toLocaleString()} bytes)`);
+    } catch (e) {
+      log(`[${nowTs()}] [error] ${e.message || e}`);
+    }
+  });
+
+  if (importGl1fFile) importGl1fFile.addEventListener("change", async () => {
+    const f = importGl1fFile.files?.[0];
+    if (!f) return;
+    try {
+      await _loadGl1fFile(f);
+    } catch (e) {
+      log(`[${nowTs()}] [error] Failed to load .gl1f: ${e.message || e}`);
+    } finally {
+      try { importGl1fFile.value = ""; } catch {}
+    }
+  });
+
 
   function syncRange(rangeEl, numEl) {
     const fromRange = () => { numEl.value = rangeEl.value; updateSize(); };
@@ -808,6 +1385,21 @@ if (ownerKeyAddr && !ownerKeyAddr.value) {
 
   if (heuristicSearchClearBtn) heuristicSearchClearBtn.addEventListener("click", () => {
     searchHistory = [];
+    searchPage = 1;
+    renderSearchTable();
+  });
+
+  // Heuristic search table pagination (25 per page)
+  if (searchPrevBtn) searchPrevBtn.addEventListener("click", () => {
+    const n = searchHistory?.length || 0;
+    const pages = Math.max(1, Math.ceil(n / SEARCH_PAGE_SIZE));
+    searchPage = Math.max(1, Math.min(pages, (searchPage | 0) - 1));
+    renderSearchTable();
+  });
+  if (searchNextBtn) searchNextBtn.addEventListener("click", () => {
+    const n = searchHistory?.length || 0;
+    const pages = Math.max(1, Math.ceil(n / SEARCH_PAGE_SIZE));
+    searchPage = Math.max(1, Math.min(pages, (searchPage | 0) + 1));
     renderSearchTable();
   });
 
@@ -982,14 +1574,36 @@ if (ownerKeyAddr && !ownerKeyAddr.value) {
     const cols = ["Round", "Status", "Metrics", "Params", "Run"];
     const head = `<thead><tr>${cols.map(c => `<th>${escapeHtml(c)}</th>`).join("")}</tr></thead>`;
 
-    if (!searchHistory?.length) {
+    const nAll = (searchHistory?.length || 0);
+    if (!nAll) {
       searchTable.innerHTML = head + `<tbody><tr><td colspan="${cols.length}" class="fiSmall">No search runs yet. Enable heuristic search and click Train.</td></tr></tbody>`;
+      if (searchPager) searchPager.style.display = "none";
       return;
+    }
+
+    // Pagination (fixed page size).
+    const totalPages = Math.max(1, Math.ceil(nAll / SEARCH_PAGE_SIZE));
+    if (!Number.isFinite(searchPage) || searchPage < 1) searchPage = 1;
+    if (searchPage > totalPages) searchPage = totalPages;
+
+    const start = (searchPage - 1) * SEARCH_PAGE_SIZE;
+    const end = Math.min(nAll, start + SEARCH_PAGE_SIZE);
+
+    if (searchPager) searchPager.style.display = "";
+    if (searchPrevBtn) searchPrevBtn.disabled = (searchPage <= 1);
+    if (searchNextBtn) searchNextBtn.disabled = (searchPage >= totalPages);
+    if (searchPageInfo) {
+      const a = (nAll ? (start + 1) : 0);
+      const b = end;
+      searchPageInfo.textContent = `Page ${searchPage} / ${totalPages} · ${a}-${b} / ${nAll}`;
     }
 
     const bestIdx = _bestSearchIndex();
 
-    const bodyRows = searchHistory.map((e, i) => {
+    const slice = searchHistory.slice(start, end);
+
+    const bodyRows = slice.map((e, j) => {
+      const i = start + j;
       const isBest = (i === bestIdx);
       const trCls = (e.status === "running") ? "searchRunning" : (e.status === "error") ? "searchError" : isBest ? "searchBest" : "";
 
@@ -1119,7 +1733,7 @@ if (ownerKeyAddr && !ownerKeyAddr.value) {
   function _fiPredictV1_Q_fromFeatQ(model, featQRow) {
     // Scalar model prediction in Q-units, but expects the feature vector already quantized.
     const { dv, nTrees, depth, baseQ, treesOff, internal, perTree } = model;
-    let acc = baseQ | 0;
+    let acc = Number(baseQ || 0);
     for (let t = 0; t < (nTrees | 0); t++) {
       const base = treesOff + t * perTree;
       let idx = 0;
@@ -1132,16 +1746,17 @@ if (ownerKeyAddr && !ownerKeyAddr.value) {
       }
       const leafIndex = idx - internal;
       const leafOff = base + internal * 8 + leafIndex * 4;
-      acc = (acc + (dv.getInt32(leafOff, true) | 0)) | 0;
+      acc += dv.getInt32(leafOff, true);
     }
     return acc;
   }
 
   function _fiPredictV2_logitsQ_fromFeatQ(model, featQRow, outLogitsQ) {
     // Vector-output model prediction in Q-units (logits), expects pre-quantized features.
+    // IMPORTANT: On-chain inference uses int256 accumulators; avoid int32 wrapping in the UI.
     const { dv, nClasses, treesPerClass, depth, treesOff, internal, perTree, baseLogitsQ } = model;
     for (let k = 0; k < (nClasses | 0); k++) {
-      let acc = baseLogitsQ[k] | 0;
+      let acc = Number(baseLogitsQ?.[k] ?? 0);
       const classTreeBase = treesOff + (k * (treesPerClass | 0)) * perTree;
       for (let t = 0; t < (treesPerClass | 0); t++) {
         const base = classTreeBase + t * perTree;
@@ -1155,7 +1770,7 @@ if (ownerKeyAddr && !ownerKeyAddr.value) {
         }
         const leafIndex = idx - internal;
         const leafOff = base + internal * 8 + leafIndex * 4;
-        acc = (acc + (dv.getInt32(leafOff, true) | 0)) | 0;
+        acc += dv.getInt32(leafOff, true);
       }
       outLogitsQ[k] = acc;
     }
@@ -1189,7 +1804,7 @@ if (ownerKeyAddr && !ownerKeyAddr.value) {
 
     if (isMulti) {
       const K = model.nClasses | 0;
-      const logitsQ = new Int32Array(K);
+      const logitsQ = new Float64Array(K);
       let loss = 0;
       let correct = 0;
       const EPS = 1e-12;
@@ -1226,7 +1841,7 @@ if (ownerKeyAddr && !ownerKeyAddr.value) {
 
     if (isMultiLabel) {
       const K = model.nClasses | 0;
-      const logitsQ = new Int32Array(K);
+      const logitsQ = new Float64Array(K);
       const EPS = 1e-12;
       let loss = 0;
       let correct = 0;
@@ -3684,8 +4299,30 @@ if (ownerKeyAddr && !ownerKeyAddr.value) {
     const f = csvFile.files?.[0];
     if (!f) return;
     log(`[${nowTs()}] Parsing CSV: ${f.name} (${f.size} bytes)`);
-    const text = await f.text();
+    // In Python engine mode, avoid loading the full CSV in the browser (keeps huge datasets workable).
+    // We only parse a small prefix to get headers + a small sample for UI selectors/plots.
+    const prefixBytes = _isPythonEngine() ? Math.min(f.size, 2 * 1024 * 1024) : f.size;
+    const text = await f.slice(0, prefixBytes).text();
     parsed = parseCSV(text);
+
+    // In Python engine mode, upload the full dataset once to the localhost cache (async).
+    if (_isPythonEngine()) {
+      try {
+        _setPyDatasetPill("Dataset: uploading…", "warn");
+        void _pyUploadDatasetFile(f).catch((e) => {
+          _setPyDatasetPill("Dataset: not cached", "bad");
+          log(`[${nowTs()}] [warn] Local upload failed (${_localEngineName()}): ${e?.message || e}`);
+        });
+      } catch (e) {
+        log(`[${nowTs()}] [warn] Local upload skipped (${_localEngineName()}): ${e?.message || e}`);
+      }
+    } else {
+      // Browser engine: clear python cache marker (optional)
+      pyDatasetId = null;
+      pyDatasetName = null;
+      _setPyDatasetPill("Dataset: not cached");
+    }
+
 
     labelCol.innerHTML = "";
     if (multiLabelSel) multiLabelSel.innerHTML = "";
@@ -3741,6 +4378,14 @@ if (ownerKeyAddr && !ownerKeyAddr.value) {
       worker = null;
     }
 
+    // Python engine stop (abort fetch + ask server to terminate subprocess)
+    if (pyTrainAbort) {
+      try { pyTrainAbort.abort(); } catch {}
+      pyTrainAbort = null;
+      try { void _pyStop(); } catch {}
+    }
+
+
     isTraining = false;
     trainPill.textContent = "Stopped";
     trainBtn.disabled = false;
@@ -3750,6 +4395,19 @@ if (ownerKeyAddr && !ownerKeyAddr.value) {
     updateDeployState();
   }
   stopBtn.addEventListener("click", stopTraining);
+
+  if (pyUploadBtn) {
+    pyUploadBtn.addEventListener("click", async () => {
+      try {
+        const f = csvFile?.files?.[0];
+        await _pyUploadDatasetFile(f);
+      } catch (e) {
+        _setPyDatasetPill("Dataset: not cached", "bad");
+        log(`[${nowTs()}] [warn] Upload failed: ${e?.message || e}`);
+      }
+    });
+  }
+
 
   function clampFloat(x, lo, hi) {
     if (!Number.isFinite(x)) return lo;
@@ -3950,6 +4608,89 @@ if (ownerKeyAddr && !ownerKeyAddr.value) {
   }
 
   async function runTrainRound({ XMaster, yMaster, nRows, nFeat, scaleQ, params, round, totalRounds, label = null }) {
+    if (_isPythonEngine()) {
+      // Ensure UI shows the current candidate params (parity with Worker mode).
+      applyParamsToTrainingUI(params);
+      try { updateSize(); } catch {}
+
+      // For Python/C++ engines the server returns the full curve only at the end (no streaming).
+      // Best practice for heuristic search: keep the previous curve visible while the next round runs,
+      // otherwise fast rounds can briefly flash an empty chart and look like it never updated.
+      const isSearch = (totalRounds > 1);
+      if (!isSearch || round === 1) {
+        const localCurve = { steps: [], train: [], val: [], test: [], bestVal: [] };
+        curve.steps = localCurve.steps;
+        curve.train = localCurve.train;
+        curve.val = localCurve.val;
+        curve.test = localCurve.test;
+        curve.bestVal = localCurve.bestVal;
+        _curveRev++;
+        drawCurves();
+      }
+
+      // Keep the feature-importance box from showing stale results during any training.
+      _featImpNonce += 1;
+      try { _fiClear("Training… feature importance will appear here when done."); } catch {}
+
+      // Kill any previous worker (if user switched engines mid-session).
+      try { worker?.terminate(); } catch {}
+      worker = null;
+      _activeTrainReject = null;
+
+      const labelPrefix = label || ((totalRounds > 1) ? `Search ${round}/${totalRounds}` : "Training");
+      const res = await runTrainRoundPython({
+        params, round, totalRounds, labelPrefix,
+        parsed,
+        selectedFeatures,
+        selectedTask,
+        selectedLabel,
+        selectedLabelCols,
+        selectedNegLabel,
+        selectedPosLabel,
+        selectedMultiLabels,
+        curve,
+        trainPill,
+        trainBar,
+        setDockState,
+        nowTs,
+        log
+      });
+
+      // Render curve + final metrics (Python/C++ engines return them only at end).
+      try {
+        _curveRev++;
+        drawCurves();
+        if (totalRounds > 1 && typeof requestAnimationFrame === "function") {
+          await new Promise((r) => requestAnimationFrame(() => r()));
+        }
+      } catch {}
+
+      try {
+        const m = res?.meta || {};
+        const metricName = m.metricName || ((m.task || selectedTask) === "regression" ? "MSE" : "LogLoss");
+        const isClass = _isClassTask(String(m.task || selectedTask));
+
+        const entries = [
+          ["Round", (totalRounds > 1) ? `${round}/${totalRounds}` : "1/1"],
+          ["Metric", String(metricName)],
+          ["Train", Number.isFinite(m.bestTrainMetric) ? Number(m.bestTrainMetric).toFixed(6) : "—"],
+          ["Val", Number.isFinite(m.bestValMetric) ? Number(m.bestValMetric).toFixed(6) : "—"],
+          ["Test", Number.isFinite(m.bestTestMetric) ? Number(m.bestTestMetric).toFixed(6) : "—"],
+          ["Best iter", Number.isFinite(m.bestIter) ? String(m.bestIter) : "—"],
+        ];
+        if (isClass) {
+          const vAcc = (m.bestValAcc != null) ? m.bestValAcc : (m.valAcc != null ? m.valAcc : m.bestValAccuracy);
+          const tAcc = (m.bestTestAcc != null) ? m.bestTestAcc : (m.testAcc != null ? m.testAcc : m.bestTestAccuracy);
+          entries.push(["Val Acc", Number.isFinite(vAcc) ? (Number(vAcc) * 100).toFixed(2) + "%" : "—"]);
+          entries.push(["Test Acc", Number.isFinite(tAcc) ? (Number(tAcc) * 100).toFixed(2) + "%" : "—"]);
+        }
+        setKV(metricsKV, entries);
+      } catch {}
+
+      return res;
+    }
+
+
     // Ensure UI shows the current candidate params.
     applyParamsToTrainingUI(params);
     try { updateSize(); } catch {}
@@ -4269,6 +5010,254 @@ if (ownerKeyAddr && !ownerKeyAddr.value) {
         if (selectedLabel === null) throw new Error("Select a label");
       }
 
+
+      // ===== Python engine: train via localhost server (dataset cached) =====
+      if (_isPythonEngine()) {
+
+        // Build an in-browser SAMPLE dataset for Preview/Compare/plots, while training uses the full cached dataset.
+        // We parse only a small CSV prefix (see csvFile.onchange) so this stays fast even for huge datasets.
+        const headers = parsed.headers || [];
+        const parsedUI = _sliceParsedRowsForUI(parsed, PY_UI_SAMPLE_ROWS);
+
+        let dsUI = null;
+        try {
+          if (selectedTask === "binary_classification") {
+            dsUI = toBinaryMatrix(parsedUI, {
+              labelIndex: selectedLabel,
+              featureIndices: selectedFeatures,
+              negLabel: selectedNegLabel,
+              posLabel: selectedPosLabel
+            });
+          } else if (selectedTask === "multiclass_classification") {
+            dsUI = toMulticlassMatrix(parsedUI, {
+              labelIndex: selectedLabel,
+              featureIndices: selectedFeatures,
+              classLabels: selectedMultiLabels
+            });
+          } else if (selectedTask === "multilabel_classification") {
+            dsUI = toMultilabelMatrix(parsedUI, {
+              labelIndices: selectedLabelCols,
+              featureIndices: selectedFeatures
+            });
+          } else {
+            dsUI = toNumericMatrix(parsedUI, { labelIndex: selectedLabel, featureIndices: selectedFeatures });
+          }
+        } catch (e) {
+          dsUI = null;
+          log(`[${nowTs()}] [warn] Could not build in-browser sample dataset: ${e?.message || e}`);
+        }
+
+        // Always keep feature/label names consistent with the selector UI, even if sample parsing failed.
+        const featNames = (selectedFeatures || []).map((i) => headers[i] || `col${i}`);
+
+        if (!dsUI) {
+          dsUI = {
+            featureNames: featNames,
+            X: [],
+            y: [],
+            droppedRows: 0,
+            labelName: (selectedTask === "multilabel_classification") ? "" : (headers[selectedLabel] || "label"),
+            labelNames: (selectedTask === "multilabel_classification")
+              ? (Array.isArray(selectedLabelCols) ? selectedLabelCols.map((i,k)=>headers[i]||`label${k}`) : [])
+              : null,
+            classes: (selectedTask === "binary_classification")
+              ? { 0: String(selectedNegLabel||"0"), 1: String(selectedPosLabel||"1") }
+              : (selectedTask === "multiclass_classification" ? (Array.isArray(selectedMultiLabels) ? selectedMultiLabels.slice() : []) : null)
+          };
+        }
+
+        // Ensure names/order match exactly what will be used for training.
+        dsUI.featureNames = featNames.slice();
+        dsUI._sample = true;
+        dsUI._sampleLimit = PY_UI_SAMPLE_ROWS;
+        datasetNumeric = dsUI;
+
+        // Dataset summary: show sample rows (preview) + note training uses full cached file.
+        const dsEntries = [
+          ["Task", taskLabel(selectedTask)],
+          ["Rows (sample)", datasetNumeric?.X?.length ? String(datasetNumeric.X.length) : "—"],
+          ["Dropped rows (sample)", Number.isFinite(datasetNumeric?.droppedRows) ? String(datasetNumeric.droppedRows) : "—"],
+          ["Features", String(featNames.length)],
+          ["Engine", `${_localEngineName()} (training uses cached full file)`],
+        ];
+        if (selectedTask === "binary_classification" && datasetNumeric?.classes) {
+          dsEntries.push(["Class mapping", `0=${datasetNumeric.classes[0]}, 1=${datasetNumeric.classes[1]}`]);
+          dsEntries.push(["Dropped other labels (sample)", String(datasetNumeric.droppedOtherLabel || 0)]);
+        } else if (selectedTask === "multiclass_classification") {
+          const nC = Array.isArray(selectedMultiLabels) ? selectedMultiLabels.length : (Array.isArray(datasetNumeric?.classes) ? datasetNumeric.classes.length : 0);
+          dsEntries.push(["Classes", String(Math.max(2, nC || 0))]);
+          dsEntries.push(["Dropped other labels (sample)", String(datasetNumeric.droppedOtherLabel || 0)]);
+        } else if (selectedTask === "multilabel_classification") {
+          const nL = Array.isArray(selectedLabelCols) ? selectedLabelCols.length : (Array.isArray(datasetNumeric?.labelNames) ? datasetNumeric.labelNames.length : 0);
+          dsEntries.push(["Labels", String(Math.max(2, nL || 0))]);
+          const miss = Number(datasetNumeric.droppedLabelMissing || 0);
+          const bad = Number(datasetNumeric.droppedLabelInvalid || 0);
+          const badF = Number(datasetNumeric.droppedBadFeature || 0);
+          if (miss) dsEntries.push(["Dropped missing labels (sample)", String(miss)]);
+          if (bad) dsEntries.push(["Dropped invalid labels (sample)", String(bad)]);
+          if (badF) dsEntries.push(["Dropped bad features (sample)", String(badF)]);
+        } else {
+          dsEntries.push(["Label", headers[selectedLabel] || "label"]);
+        }
+        setKV(dsKV, dsEntries);
+
+
+        // Determine nClasses for size clamp.
+        let nClasses = 1;
+        if (selectedTask === "binary_classification") nClasses = 2;
+        else if (selectedTask === "multiclass_classification") nClasses = Math.max(2, Array.isArray(selectedMultiLabels) ? selectedMultiLabels.length : 2);
+        else if (selectedTask === "multilabel_classification") nClasses = Math.max(2, Array.isArray(selectedLabelCols) ? selectedLabelCols.length : 2);
+
+        // Read base params (UI) + enforce size constraints.
+        const baseParams = readBaseTrainParams({ nClasses });
+        const doSearch = !!heuristicSearchOn?.checked;
+        const doRefit = !!refitOn?.checked;
+
+        const maxRounds = doSearch
+          ? clampInt(parseInt(heuristicSearchRounds?.value || "10", 10), 1, 1000)
+          : 1;
+
+        // Clear previous trained model while running (prevents deploying stale output).
+        trained = null;
+        renderPreviewInputs();
+        updateDeployState();
+
+        isTraining = true;
+        isSearching = doSearch;
+        searchAbort = false;
+        trainBtn.disabled = true;
+        stopBtn.disabled = false;
+        trainBar.style.width = "0%";
+        trainPill.textContent = doSearch ? `Search 1/${maxRounds}…` : "Training…";
+        setDockState("training");
+
+        lastTrainInfo = {
+          task: selectedTask,
+          seed: baseParams.seed,
+          splitTrain: baseParams.splitTrain,
+          splitVal: baseParams.splitVal,
+          nRows: NaN,
+          nFeatures: featNames.length,
+          nClasses
+        };
+
+        // Search loop (unchanged logic: only backend differs)
+        if (doSearch) {
+          searchHistory = [];
+          searchPage = 1;
+          renderSearchTable();
+
+          const rng = _xorshift32(baseParams.seed ^ 0x9e3779b9);
+          let best = null;
+          let bestScore = Infinity;
+          let bestRound = 0;
+
+          for (let round = 1; round <= maxRounds; round++) {
+            if (searchAbort) break;
+
+            const params = (round === 1)
+              ? { ...baseParams }
+              : generateHeuristicCandidate({ baseParams, bestParams: best?.params || null, round, rng });
+
+            const entry = { round, status: "running", params: _maybeDeepCopy(params), meta: null, curve: null, error: null };
+            // Keep the view on the latest page while the search grows (but don't yank the user
+            // off an older page if they've intentionally paged back).
+            const pagesBefore = Math.max(1, Math.ceil((searchHistory?.length || 0) / SEARCH_PAGE_SIZE));
+            searchHistory.push(entry);
+            const pagesAfter = Math.max(1, Math.ceil((searchHistory?.length || 0) / SEARCH_PAGE_SIZE));
+            if ((searchPage | 0) >= pagesBefore) searchPage = pagesAfter;
+            renderSearchTable();
+
+            try {
+              const res = await runTrainRound({ XMaster: null, yMaster: null, nRows: 0, nFeat: featNames.length, scaleQ: "auto", params, round, totalRounds: maxRounds });
+              entry.status = "done";
+              entry.meta = res.meta;
+              entry.curve = res.curve;
+
+              const score = res?.meta?.bestValMetric;
+              if (Number.isFinite(score) && score < bestScore) {
+                bestScore = score;
+                bestRound = round;
+                best = { ...res, params };
+              }
+            } catch (err) {
+              if (searchAbort) {
+                entry.status = "stopped";
+                entry.error = "Stopped";
+                renderSearchTable();
+                break;
+              }
+              entry.status = "error";
+              entry.error = err?.message || String(err);
+            }
+            renderSearchTable();
+          }
+
+          if (!best || !best.bytes || !best.meta) throw new Error(searchAbort ? "Training stopped" : "No successful search runs");
+
+          curve.steps = best.curve.steps;
+          curve.train = best.curve.train;
+          curve.val = best.curve.val;
+          curve.test = best.curve.test;
+          curve.bestVal = best.curve.bestVal || [];
+          drawCurves();
+
+          applyParamsToTrainingUI(best.params);
+          try { updateSize(); } catch {}
+
+          // Optional refit: python backend supports refitTrainVal param (same as worker).
+          let finalRes = best;
+          if (doRefit && !searchAbort) {
+            const usedTrees = Number(best?.meta?.usedTrees ?? best?.params?.trees ?? baseParams.trees);
+            const refitParams = { ...best.params, trees: usedTrees, earlyStop: false, refitTrainVal: true };
+            log(`[${nowTs()}] Refit enabled: training on Train+Val for ${usedTrees} trees (size unchanged).`);
+            const refitRes = await runTrainRound({ XMaster: null, yMaster: null, nRows: 0, nFeat: featNames.length, scaleQ: "auto", params: refitParams, round: 1, totalRounds: 1, label: "Refit" });
+            finalRes = { ...refitRes, params: refitParams };
+            applyParamsToTrainingUI(refitParams);
+            try { updateSize(); } catch {}
+          }
+
+          applyTrainedModel(finalRes);
+
+          trainBar.style.width = "100%";
+          trainPill.textContent = searchAbort ? `Stopped (best round ${bestRound}/${maxRounds})` : `Done (best round ${bestRound}/${maxRounds}${(finalRes !== best) ? " + refit" : ""})`;
+          if (searchAbort) log(`[${nowTs()}] Search stopped by user. Best round=${bestRound}/${maxRounds} bestVal=${bestScore.toFixed(6)}`);
+          else log(`[${nowTs()}] Search complete. Best round=${bestRound}/${maxRounds} bestVal=${bestScore.toFixed(6)}${(finalRes !== best) ? " (refit applied)" : ""}`);
+
+          renderPreviewInputs();
+          updateDeployState();
+
+        } else {
+          const res = await runTrainRound({ XMaster: null, yMaster: null, nRows: 0, nFeat: featNames.length, scaleQ: "auto", params: baseParams, round: 1, totalRounds: 1 });
+
+          let finalRes = res;
+          if (doRefit) {
+            const usedTrees = Number(res?.meta?.usedTrees ?? baseParams.trees);
+            const refitParams = { ...baseParams, trees: usedTrees, earlyStop: false, refitTrainVal: true };
+            log(`[${nowTs()}] Refit enabled: training on Train+Val for ${usedTrees} trees (size unchanged).`);
+            const refitRes = await runTrainRound({ XMaster: null, yMaster: null, nRows: 0, nFeat: featNames.length, scaleQ: "auto", params: refitParams, round: 1, totalRounds: 1, label: "Refit" });
+            finalRes = { ...refitRes, params: refitParams };
+            applyParamsToTrainingUI(refitParams);
+            try { updateSize(); } catch {}
+          }
+
+          applyTrainedModel(finalRes);
+          trainBar.style.width = "100%";
+          trainPill.textContent = (finalRes !== res) ? "Done (refit)" : "Done";
+          log(`[${nowTs()}] Model ready (${_localEngineName()}). task=${selectedTask} modelId=${trained.modelId} bytes=${trained.bytes.length} features=${trained.decoded.nFeatures} trees=${trained.decoded.nTrees}` + ((finalRes !== res) ? " (refit applied)" : ""));
+
+          renderPreviewInputs();
+          updateDeployState();
+        }
+
+        isTraining = false;
+        isSearching = false;
+        stopBtn.disabled = true;
+        trainBtn.disabled = false;
+        setDockState("idle");
+        return;
+      }
+
       // Build numeric dataset
       if (selectedTask === "binary_classification") {
         if (!selectedNegLabel || !selectedPosLabel) {
@@ -4429,6 +5418,7 @@ if (ownerKeyAddr && !ownerKeyAddr.value) {
       if (doSearch) {
         // Reset search history table.
         searchHistory = [];
+        searchPage = 1;
         renderSearchTable();
 
         const rng = _xorshift32(baseParams.seed ^ 0x9e3779b9);
@@ -4452,7 +5442,12 @@ if (ownerKeyAddr && !ownerKeyAddr.value) {
             curve: null,
             error: null,
           };
+          // Keep the view on the latest page while the search grows (but don't yank the user
+          // off an older page if they've intentionally paged back).
+          const pagesBefore = Math.max(1, Math.ceil((searchHistory?.length || 0) / SEARCH_PAGE_SIZE));
           searchHistory.push(entry);
+          const pagesAfter = Math.max(1, Math.ceil((searchHistory?.length || 0) / SEARCH_PAGE_SIZE));
+          if ((searchPage | 0) >= pagesBefore) searchPage = pagesAfter;
           renderSearchTable();
 
           try {
@@ -4753,6 +5748,8 @@ if (ownerKeyAddr && !ownerKeyAddr.value) {
     try { renderPreviewBestModelBlocks(); } catch {}
 
     scheduleDeployEstimate();
+
+    try { updateGl1fUI(); } catch {}
   }
 
   [metaName, metaDesc, agreeTos, agreeLicense, ownerKeySaved, pricingMode, pricingFee, pricingRecipient].forEach((el) => {
@@ -4961,4 +5958,5 @@ if (ownerKeyAddr && !ownerKeyAddr.value) {
   updateTaskUI();
   updateSize();
   updateDeployState();
+  try { updateGl1fUI(); } catch {}
 });

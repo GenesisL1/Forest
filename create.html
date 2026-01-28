@@ -662,9 +662,48 @@ SOFTWARE.
       <div class="fiTableWrap" style="margin-top: 12px;">
         <table class="fiTable resp" id="searchTable"></table>
       </div>
+
+      <div id="searchPager" class="row wrap spread" style="margin-top: 10px; align-items: center; display:none;">
+        <div class="row wrap" style="gap: 10px; align-items:center;">
+          <button id="searchPrevBtn" class="btn2" type="button">← Prev</button>
+          <button id="searchNextBtn" class="btn2" type="button">Next →</button>
+          <span class="muted" id="searchPageInfo">Page 1 / 1</span>
+        </div>
+      </div>
       </details>
 
-      <div class="row wrap spread">
+      
+      <div class="detailsCard" style="margin-top: 12px;">
+        <div class="row wrap spread" style="align-items:center; gap: 12px;">
+          <div class="stStack" style="min-width: 220px;">
+            <div class="stK">Training engine</div>
+            <div class="row wrap" style="gap: 10px; align-items:center;">
+              <select id="trainEngineSel" style="min-width: 220px;">
+                <option value="browser">Browser (WebWorker)</option>
+                <option value="python">Python (local trainer)</option>
+                <option value="cpp">C++ (local trainer)</option>
+              </select>
+            </div>
+            <div class="muted" style="margin-top:6px;">
+              Python mode enables huge datasets via a localhost server and dataset caching (upload once, reuse for search rounds).
+            </div>
+          </div>
+
+          <div class="stStack" style="min-width: 320px; flex: 1;">
+            <div class="stK">Python API (localhost)</div>
+            <div class="row wrap" style="gap: 10px; align-items:center;">
+              <input id="pythonApiUrl" value="http://127.0.0.1:8787" placeholder="http://127.0.0.1:8787" />
+              <span class="pill" id="pyDatasetPill">Dataset: not cached</span>
+              <button class="btn2" id="pyUploadBtn" type="button">Upload dataset</button>
+            </div>
+            <div class="muted" style="margin-top:6px;">
+              Run <span class="mono">python3 local_trainer_server.py</span> first. Dataset upload uses your selected CSV file (Dataset tab).
+            </div>
+          </div>
+        </div>
+      </div>
+
+<div class="row wrap spread">
         <span class="pill" id="trainPill">Idle</span>
         <div class="row wrap" style="gap: 12px;">
           <button class="btn primary" id="trainBtn">Train</button>
@@ -683,6 +722,25 @@ SOFTWARE.
     <section class="panel tabPanel" id="panel-preview" role="tabpanel" aria-labelledby="tab-preview" data-tab-panel="preview" hidden>
       <h2>Local preview</h2>
       <div class="muted" id="previewFeatHint">Train a model to enable.</div>
+
+      <div class="sep"></div>
+
+
+      <h3 style="margin-top: 0;">Model file (.gl1f)</h3>
+      <div class="muted">Save a portable model package (bytes + metadata) or load a previously exported .gl1f.</div>
+      <div class="row wrap" style="gap: 12px; align-items:center; margin-top: 12px;">
+        <button class="btn small" id="exportGl1fBtn" disabled>Export .gl1f</button>
+        <label class="btn small" style="position: relative; overflow: hidden;">
+          Load .gl1f
+          <input id="importGl1fFile" type="file" accept=".gl1f,application/octet-stream"
+                style="position:absolute; inset:0; opacity:0; cursor:pointer;" />
+        </label>
+        <span class="pill" id="gl1fPill">Model file: none</span>
+      </div>
+      <div class="muted" style="margin-top: 10px;">
+        Export includes model bytes + feature labels + task, plus curve/params (if available) and the current Mint tab
+        fields (name/description/icon/pricing) if you filled them.
+      </div>
 
       <div class="sep"></div>
 

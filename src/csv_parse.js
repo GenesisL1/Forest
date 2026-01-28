@@ -22,11 +22,106 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-// Simple CSV parser with quoted fields.
-// Returns: { headers: string[], rows: string[][] }
+// Robust CSV parser with quoted fields + delimiter auto-detection.
+// API expected by create_page.js:
+//  - parseCSV(text) -> { headers: string[], rows: string[][], delimiter: string }
+//  - toNumericMatrix
+//  - inferLabelValues
+//  - toBinaryMatrix
+//  - toMulticlassMatrix
+//  - toMultilabelMatrix
+//
+// Supports delimiters: comma, semicolon, tab, pipe.
+
+const _DELIM_CANDS = [",", ";", "\t", "|"];
+
+// Split a single CSV line with quotes, for delimiter detection (no newlines).
+function _splitCsvLine(line, delim) {
+  const out = [];
+  let cur = "";
+  let inQ = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    const n = line[i + 1];
+
+    if (inQ) {
+      if (c === '"' && n === '"') { cur += '"'; i++; continue; }
+      if (c === '"') { inQ = false; continue; }
+      cur += c;
+      continue;
+    }
+
+    if (c === '"') { inQ = true; continue; }
+    if (c === "\r") continue;
+
+    if (c === delim) { out.push(cur); cur = ""; continue; }
+    cur += c;
+  }
+  out.push(cur);
+  return out;
+}
+
+export function detectCSVDelimiter(text) {
+  const s = String(text || "");
+  const lines = s
+    .split("\n")
+    .map((x) => x.replace(/\r/g, ""))
+    .filter((x) => x.trim().length);
+
+  const sample = lines.slice(0, 20);
+  if (!sample.length) return ",";
+
+  let best = ",";
+  let bestMode = 1;
+  let bestFreq = 0;
+  let bestPenalty = Number.POSITIVE_INFINITY;
+
+  for (const d of _DELIM_CANDS) {
+    const freq = new Map();
+    let penalty = 0;
+
+    for (const ln of sample) {
+      const row = _splitCsvLine(ln, d);
+      const n = row.length;
+      freq.set(n, (freq.get(n) || 0) + 1);
+
+      // Penalty: how many other delimiter chars appear inside cells.
+      for (const cell of row) {
+        for (const od of _DELIM_CANDS) {
+          if (od === d) continue;
+          for (let i = 0; i < cell.length; i++) if (cell[i] === od) penalty++;
+        }
+      }
+    }
+
+    // Find mode column count
+    let modeN = 1, modeF = 0;
+    for (const [k, v] of freq.entries()) {
+      if (v > modeF || (v === modeF && k > modeN)) { modeN = k; modeF = v; }
+    }
+    if (modeN < 2) continue;
+
+    // Prefer: higher mode frequency; tie-break: higher modeN; tie-break: lower penalty
+    if (
+      modeF > bestFreq ||
+      (modeF === bestFreq && modeN > bestMode) ||
+      (modeF === bestFreq && modeN === bestMode && penalty < bestPenalty)
+    ) {
+      best = d;
+      bestFreq = modeF;
+      bestMode = modeN;
+      bestPenalty = penalty;
+    }
+  }
+
+  return best;
+}
 
 export function parseCSV(text) {
   const s = String(text || "");
+  const delimiter = detectCSVDelimiter(s);
+
   const rows = [];
   let row = [];
   let cur = "";
@@ -47,11 +142,10 @@ export function parseCSV(text) {
     }
 
     if (c === '"') { inQ = true; continue; }
-    if (c === ",") { pushCell(); continue; }
+    if (c === delimiter) { pushCell(); continue; }
     if (c === "\r") continue;
 
     if (c === "\n") { pushCell(); pushRow(); continue; }
-
     cur += c;
   }
 
@@ -59,15 +153,20 @@ export function parseCSV(text) {
   if (row.length) pushRow();
 
   const headers = (rows[0] || []).map((h) => String(h || "").trim());
-  const data = rows.slice(1).filter((r) => r.length && r.some((x) => String(x || "").trim().length));
+  if (headers.length && headers[0].startsWith("\uFEFF")) headers[0] = headers[0].replace(/^\uFEFF+/, "");
 
+  const data = rows
+    .slice(1)
+    .filter((r) => r.length && r.some((x) => String(x || "").trim().length));
+
+  // Normalize row length to header length
   const norm = data.map((r) => {
     const out = new Array(headers.length).fill("");
     for (let i = 0; i < headers.length; i++) out[i] = (r[i] ?? "").toString().trim();
     return out;
   });
 
-  return { headers, rows: norm };
+  return { headers, rows: norm, delimiter };
 }
 
 export function toNumericMatrix(parsed, { labelIndex, featureIndices }) {
@@ -101,12 +200,10 @@ export function toNumericMatrix(parsed, { labelIndex, featureIndices }) {
   return { X, y, featureNames, labelName, droppedRows };
 }
 
-// ---- Binary classification helpers ----
-
+// ---- label canonicalization helpers ----
 function _isStrictNumber(str) {
   const s = String(str ?? "").trim();
   if (!s) return false;
-  // Covers: 1, -1, 1.23, .5, 1e-3, -2E6
   return /^[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?$/.test(s);
 }
 
@@ -114,14 +211,12 @@ function _canonLabel(raw) {
   const s = String(raw ?? "").trim();
   if (!s) return "";
   if (_isStrictNumber(s)) {
-    // Canonical numeric string ("01" -> "1", "1.0" -> "1")
     const n = Number(s);
     if (Number.isFinite(n)) return String(n);
   }
   return s;
 }
 
-// Infer unique label values (canonicalized). Useful for binary classification.
 export function inferLabelValues(parsed, labelIndex) {
   const rows = parsed?.rows || [];
   const counts = new Map();
@@ -149,11 +244,6 @@ export function inferLabelValues(parsed, labelIndex) {
   return { values, counts, allNumeric };
 }
 
-// Convert to numeric X and binary y (0/1). Rows with:
-// - missing/non-numeric features
-// - missing labels
-// - labels not in the chosen {negLabel,posLabel}
-// are dropped.
 export function toBinaryMatrix(parsed, { labelIndex, featureIndices, negLabel, posLabel }) {
   const headers = parsed.headers;
   const rows = parsed.rows;
@@ -174,6 +264,7 @@ export function toBinaryMatrix(parsed, { labelIndex, featureIndices, negLabel, p
   for (const r of rows) {
     const labRaw = _canonLabel(r[labelIndex]);
     if (!labRaw) { droppedRows++; continue; }
+
     let yy = null;
     if (labRaw === neg) yy = 0;
     else if (labRaw === pos) yy = 1;
@@ -203,12 +294,6 @@ export function toBinaryMatrix(parsed, { labelIndex, featureIndices, negLabel, p
   };
 }
 
-// Convert to numeric X and multiclass y (0..K-1) according to the provided classLabels.
-// Rows with:
-// - missing/non-numeric features
-// - missing labels
-// - labels not in classLabels
-// are dropped.
 export function toMulticlassMatrix(parsed, { labelIndex, featureIndices, classLabels }) {
   const headers = parsed.headers;
   const rows = parsed.rows;
@@ -263,9 +348,10 @@ export function toMulticlassMatrix(parsed, { labelIndex, featureIndices, classLa
   };
 }
 
+// ---- Multilabel helpers ----
+
 // Parse a binary 0/1 label from a CSV cell.
 // Supports: 0/1, true/false, yes/no, t/f, y/n (case-insensitive)
-// Returns: 0 | 1 | null (invalid/missing)
 function _parseBinary01(raw) {
   if (raw === null || raw === undefined) return null;
   const s = String(raw).trim();
@@ -275,7 +361,6 @@ function _parseBinary01(raw) {
   if (k === "1" || k === "1.0") return 1;
   if (k === "true" || k === "t" || k === "yes" || k === "y") return 1;
   if (k === "false" || k === "f" || k === "no" || k === "n") return 0;
-  // Fallback: strict numeric parse for "0"/"1" variants.
   if (_isStrictNumber(k)) {
     const n = Number(k);
     if (n === 0) return 0;
@@ -286,34 +371,39 @@ function _parseBinary01(raw) {
 
 // Convert to numeric X and multilabel y (one binary label per selected column).
 // Drops rows where any selected label cell is missing/invalid or any selected feature is non-numeric.
-// Returns y both as a matrix (array-of-arrays) and a packed Float32Array row-major.
 export function toMultilabelMatrix(parsed, { labelIndices, featureIndices }) {
   if (!parsed || !Array.isArray(parsed.headers) || !Array.isArray(parsed.rows)) throw new Error("Bad parsed CSV");
   const nCols = parsed.headers.length;
 
-  const labIdx = Array.from(labelIndices || []).map((x) => Number(x)).filter((x) => Number.isFinite(x));
+  const labIdx = Array.from(labelIndices || [])
+    .map((x) => Number(x))
+    .filter((x) => Number.isFinite(x));
+
   if (!labIdx.length) throw new Error("Need at least 1 label column");
-  // Dedup while preserving order.
-  const seen = new Set();
+
+  // Dedup while preserving order
+  const seenL = new Set();
   const labelCols = [];
   for (const i of labIdx) {
     const ii = i | 0;
     if (ii < 0 || ii >= nCols) continue;
-    if (seen.has(ii)) continue;
-    seen.add(ii);
+    if (seenL.has(ii)) continue;
+    seenL.add(ii);
     labelCols.push(ii);
   }
   if (!labelCols.length) throw new Error("No valid label columns selected");
 
-  const featIdx = Array.from(featureIndices || []).map((x) => Number(x)).filter((x) => Number.isFinite(x));
-  const featCols = [];
+  const featIdx = Array.from(featureIndices || [])
+    .map((x) => Number(x))
+    .filter((x) => Number.isFinite(x));
+
   const seenF = new Set();
+  const featCols = [];
   for (const i of featIdx) {
     const ii = i | 0;
     if (ii < 0 || ii >= nCols) continue;
     if (seenF.has(ii)) continue;
-    // Features cannot overlap labels.
-    if (seen.has(ii)) continue;
+    if (seenL.has(ii)) continue; // disallow overlap with labels
     seenF.add(ii);
     featCols.push(ii);
   }
@@ -331,52 +421,34 @@ export function toMultilabelMatrix(parsed, { labelIndices, featureIndices }) {
   let droppedBadFeature = 0;
 
   for (const row of parsed.rows) {
-    // Parse labels
     const yRow = new Array(nLabels);
     let bad = false;
+
+    // labels
     for (let k = 0; k < nLabels; k++) {
       const v = row[labelCols[k]];
       const s = (v === null || v === undefined) ? "" : String(v).trim();
-      if (!s) {
-        droppedLabelMissing += 1;
-        bad = true;
-        break;
-      }
+      if (!s) { droppedLabelMissing++; bad = true; break; }
       const b = _parseBinary01(s);
-      if (b === null) {
-        droppedLabelInvalid += 1;
-        bad = true;
-        break;
-      }
+      if (b === null) { droppedLabelInvalid++; bad = true; break; }
       yRow[k] = b;
     }
-    if (bad) {
-      droppedRows += 1;
-      continue;
-    }
+    if (bad) { droppedRows++; continue; }
 
-    // Parse features (numeric)
+    // features
     const xRow = new Array(featCols.length);
     for (let j = 0; j < featCols.length; j++) {
       const raw = row[featCols[j]];
       const num = parseFloat(raw);
-      if (!Number.isFinite(num)) {
-        droppedBadFeature += 1;
-        bad = true;
-        break;
-      }
+      if (!Number.isFinite(num)) { droppedBadFeature++; bad = true; break; }
       xRow[j] = num;
     }
-    if (bad) {
-      droppedRows += 1;
-      continue;
-    }
+    if (bad) { droppedRows++; continue; }
 
     X.push(xRow);
     y.push(yRow);
   }
 
-  // Pack yFlat (row-major)
   const yFlat = new Float32Array(y.length * nLabels);
   for (let r = 0; r < y.length; r++) {
     const base = r * nLabels;
@@ -396,3 +468,4 @@ export function toMultilabelMatrix(parsed, { labelIndices, featureIndices }) {
     droppedBadFeature,
   };
 }
+

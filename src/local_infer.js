@@ -31,10 +31,102 @@ const ethers = globalThis.ethers;
 
 const MAGIC = "GL1F"; // model magic
 const CHUNK_MAGIC = "GL1C"; // chunk/table magic
+const PACKAGE_MAGIC = "GL1X"; // optional JSON footer
+
 
 function readU16(dv, off) { return dv.getUint16(off, true); }
 function readU32(dv, off) { return dv.getUint32(off, true); }
 function readI32(dv, off) { return dv.getInt32(off, true); }
+
+function _u8From(bytesU8){
+  return (bytesU8 instanceof Uint8Array) ? bytesU8 : new Uint8Array(bytesU8);
+}
+
+// Compute the exact GL1F model byte length (without any trailing package footer).
+export function gl1fModelLength(bytesU8){
+  const u8 = _u8From(bytesU8);
+  if (u8.length < 24) throw new Error("GL1F bytes too short");
+  const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+  const m = String.fromCharCode(u8[0], u8[1], u8[2], u8[3]);
+  if (m !== MAGIC) throw new Error("Missing GL1F magic");
+  const ver = u8[4];
+
+  const depth = readU16(dv, 8);
+  const pow2 = 1 << depth;
+  const internal = pow2 - 1;
+  const perTree = internal * 8 + pow2 * 4;
+
+  if (ver === 1){
+    const nTrees = readU32(dv, 10);
+    const expect = 24 + nTrees * perTree;
+    if (u8.length < expect) throw new Error(`Model bytes truncated (${u8.length} < ${expect})`);
+    return expect;
+  }
+  if (ver === 2){
+    const treesPerClass = readU32(dv, 10);
+    const nClasses = readU16(dv, 22);
+    const treesOff = 24 + nClasses * 4;
+    const expect = treesOff + (treesPerClass * nClasses) * perTree;
+    if (u8.length < expect) throw new Error(`Model bytes truncated (${u8.length} < ${expect})`);
+    return expect;
+  }
+  throw new Error(`Unsupported GL1F version ${ver}`);
+}
+
+// Parse an optional GL1X footer from a .gl1f file.
+// Returns: { modelBytes:Uint8Array, pkg:Object|null, hasFooter:boolean }
+export function parseGl1fPackage(bytesU8){
+  const u8 = _u8From(bytesU8);
+  const modelLen = gl1fModelLength(u8);
+
+  if (u8.length < modelLen + 12) return { modelBytes: u8.slice(0, modelLen), pkg: null, hasFooter: false };
+
+  const magic = String.fromCharCode(u8[modelLen], u8[modelLen+1], u8[modelLen+2], u8[modelLen+3]);
+  if (magic !== PACKAGE_MAGIC) return { modelBytes: u8.slice(0, modelLen), pkg: null, hasFooter: false };
+
+  const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+  const jsonLen = dv.getUint32(modelLen + 8, true);
+  const start = modelLen + 12;
+  const end = start + Number(jsonLen);
+
+  let pkg = null;
+  if (end <= u8.length && jsonLen > 0){
+    try {
+      const raw = u8.slice(start, end);
+      const str = new TextDecoder("utf-8").decode(raw);
+      pkg = JSON.parse(str);
+    } catch {
+      pkg = null;
+    }
+  }
+  return { modelBytes: u8.slice(0, modelLen), pkg, hasFooter: true };
+}
+
+export function buildGl1xFooter(pkgObj){
+  const payload = new TextEncoder().encode(JSON.stringify(pkgObj));
+  const header = new Uint8Array(12);
+  header[0] = 0x47; // G
+  header[1] = 0x4c; // L
+  header[2] = 0x31; // 1
+  header[3] = 0x58; // X
+  header[4] = 1; header[5] = 0; header[6] = 0; header[7] = 0;
+  new DataView(header.buffer).setUint32(8, payload.length >>> 0, true);
+
+  const out = new Uint8Array(header.length + payload.length);
+  out.set(header, 0);
+  out.set(payload, header.length);
+  return out;
+}
+
+export function attachGl1xFooter(modelBytesU8, pkgObj){
+  const modelBytes = _u8From(modelBytesU8);
+  const footer = buildGl1xFooter(pkgObj);
+  const out = new Uint8Array(modelBytes.length + footer.length);
+  out.set(modelBytes, 0);
+  out.set(footer, modelBytes.length);
+  return out;
+}
+
 
 export function decodeModel(bytesU8) {
   const u8 = bytesU8 instanceof Uint8Array ? bytesU8 : new Uint8Array(bytesU8);
@@ -172,7 +264,7 @@ export function predictQ(model, featuresFloat) {
 }
 
 // Predict all class/label logits for a v2 vector-output model.
-// Returns: Int32Array logitsQ[k] in Q-units.
+// Returns: number[] logitsQ[k] in Q-units (integer).
 export function predictMultiQ(model, featuresFloat) {
   if (model?.version !== 2) throw new Error("predictMultiQ only supports v2 models");
   const { dv, nFeatures, depth, scaleQ, treesOff, internal, perTree, nClasses, treesPerClass, baseLogitsQ } = model;
@@ -185,9 +277,11 @@ export function predictMultiQ(model, featuresFloat) {
     featQ[i] = Math.max(-2147483648, Math.min(2147483647, q));
   }
 
-  const logits = new Int32Array(nClasses);
+  // IMPORTANT: On-chain runtime accumulates logits in int256. Using Int32Array (and bitwise casts)
+  // can overflow/wrap for large models. Use JS numbers (safe up to 2^53 for typical scaleQ/tree counts).
+  const logits = new Array(nClasses);
   for (let k = 0; k < nClasses; k++) {
-    let acc = baseLogitsQ[k] | 0;
+    let acc = Number(baseLogitsQ?.[k] ?? 0);
     const classTreeBase = treesOff + (k * treesPerClass) * perTree;
 
     for (let t = 0; t < treesPerClass; t++) {
@@ -214,14 +308,14 @@ export function predictMultiQ(model, featuresFloat) {
 }
 
 // Predict the argmax class for a v2 multiclass model.
-// Returns: { classIndex, bestLogitQ, logitsQ:Int32Array }
+// Returns: { classIndex, bestLogitQ, logitsQ:number[] }
 export function predictClassQ(model, featuresFloat) {
   if (model?.version !== 2) throw new Error("predictClassQ only supports v2 multiclass models");
   const logits = predictMultiQ(model, featuresFloat);
   let bestK = 0;
-  let best = logits[0] | 0;
+  let best = Number(logits[0] ?? 0);
   for (let k = 1; k < logits.length; k++) {
-    const v = logits[k] | 0;
+    const v = Number(logits[k]);
     if (v > best) { best = v; bestK = k; }
   }
   return { classIndex: bestK, bestLogitQ: best, logitsQ: logits };
