@@ -7,8 +7,73 @@
 
 ---
 
+## Fast start
+
+Five typical invocations. Each runs from the `Forest/` repo root.
+
+#### 1. Single dataset — the minimal run
+
+ETH 15m up-classifier, slim 31-feature set. One CSV.
+
+```bash
+python examples/datasets/create.py \
+    --ticker ETH --candle 15m --class up \
+    --base ema5 --move-pct 1.5 --no-retrace 0.5 \
+    --horizon 4h --start-date 01-01-2024 --small
+```
+
+#### 2. Symmetric up/down pair
+
+One classifier per direction, ensemble at inference. Two CSVs, one Binance fetch.
+
+```bash
+python examples/datasets/create.py \
+    --ticker ETH --candle 15m --class up,down \
+    --base ema5 --move-pct 1.5 --no-retrace 0.5 \
+    --horizon 4h --start-date 01-01-2023 --small
+```
+
+#### 3. Hyperparameter sweep
+
+Sweep `move × retrace × horizon` to pick the best (move, retrace, horizon) by validation log-loss. 24 CSVs, one fetch.
+
+```bash
+python examples/datasets/create.py \
+    --ticker ETH --candle 15m --class up \
+    --base ema5 --move-pct 1.0,1.5,2.0,2.5 \
+    --no-retrace 0.3,0.5,0.7 --horizon 2h,4h \
+    --start-date 01-01-2023 --output-dir ./sweep --small
+```
+
+#### 4. R1 reference (log-loss 0.1254)
+
+Exact configuration of the GL1F R1 reference model.
+
+```bash
+python examples/datasets/create.py \
+    --ticker ETH --candle 15m --class up \
+    --base ema5 --move-pct 2.0 --no-retrace 0.7 \
+    --horizon 5h --start-date 01-01-2022 --end-date 01-01-2025 \
+    --output-dir ./datasets/r1 --small
+```
+
+#### 5. Cross-ticker macro baseline
+
+BTC + ETH + SOL on 1h candles, both directions, full ~150-column feature matrix. Six CSVs, three fetches.
+
+```bash
+python examples/datasets/create.py \
+    --ticker BTC,ETH,SOL --candle 1h --class up,down \
+    --base ema7 --move-pct 2.0 --no-retrace 1.0 \
+    --horizon 12h --start-date 01-01-2022 \
+    --output-dir ./datasets/macro_1h
+```
+
+---
+
 ## Table of contents
 
+- [Fast start](#fast-start)
 - [What this is](#what-this-is)
 - [Why it exists (GL1F context)](#why-it-exists-gl1f-context)
 - [Install](#install)
