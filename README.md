@@ -451,6 +451,167 @@ This footer is **not used for inference**, and should be stripped before computi
 - Compact contiguous layout => efficient bytecode storage and fast decoding.
 - Vector-output v2 => multiclass/multilabel without separate model assets.
 
+---
+
+# Headless minting — `model_mint.py`
+
+`model_mint.py` (repo root) is the **command-line equivalent of the Forest studio's Mint tab**. It mirrors the browser/MetaMask flow byte-for-byte, but signs every transaction with a private key from `.env` — so a large model that would otherwise require hundreds of MetaMask confirmations can be deployed unattended in a single run.
+
+It is the right tool when:
+- **The model is large** (hundreds of KB to several MB), where the browser path means clicking through 100–600+ MetaMask popups.
+- **You need reproducible paper artifacts** — every run emits `S1.json` (Supplementary Table S1) with every on-chain identifier needed to cite the deployment.
+- **The mint may be interrupted** — `mint_state.json` allows resumption from the last completed chunk.
+- **You want a pre-flight check** — `--dry-run` validates the whole flow without sending any transaction.
+
+## What it does (UI parity)
+
+The script replicates `src/create_page.js` (the `deployBtn` handler) exactly:
+
+1. **Load** the `.gl1f` file, strip the optional `GL1X` JSON footer.
+2. **Compute** `modelId = keccak256(core_bytes)` — over the post-footer core only, matching the on-chain runtime.
+3. **Read registry state**: `deployFeeWei`, `sizeFeeWeiPerByte`, `requiredDeployFeeWei(totalBytes)`, `activeLicenseId`, `tosVersion`.
+4. **Chunk-deploy the model**: split the core into `CHUNK_SIZE = 24000`-byte chunks. For each chunk:
+   - call `store.write(chunk)` → wait for receipt → parse `ChunkWritten` event → record the chunk-contract pointer.
+5. **Build the pointer table**: 32 bytes per chunk pointer (right-aligned in the slot, padding zeros on the left), then `store.write(table)` to deploy it.
+6. **Register the model**: a single `registry.registerModel(...)` call (payable, value = `requiredDeployFeeWei`) which also mints the ERC-721 Model NFT.
+7. **Emit artifacts** (see below).
+
+One transaction per block, sequentially — same ordering as the UI. No batching, no parallel sending.
+
+## Inputs
+
+### CLI flags
+
+| Flag | Required | Default | Purpose |
+|---|:---:|---|---|
+| `--gl1f` | ✓ | — | Path to `.gl1f` file. |
+| `--env` |   | `./.env` | Path to `.env` (see below). |
+| `--rpc` |   | `RPC_URL` from env, else `https://rpc.genesisl1.org` | Override RPC endpoint. |
+| `--resume` |   | — | Resume from `mint_state.json`, skipping completed chunks. |
+| `--dry-run` |   | — | Validate and build everything, send NO transactions. |
+| `--pricing-mode` |   | `0` | `0 = free`, `1 = tips`, `2 = paid required`. |
+| `--pricing-fee-eth` |   | `0.001` | Per-inference fee in L1, used when mode ≠ 0. |
+| `--pricing-recipient` |   | signer address | Address to receive inference fees. |
+| `--task` |   | `regression` | Task type. *Only consulted if `.gl1f` has no `GL1X` footer.* |
+| `--label-name` |   | `target` | Label-column name. *Only if no footer.* |
+| `--feature-names-file` |   | — | Newline-separated file of feature names. *Only if no footer.* |
+| `--store-addr` |   | live address | Override `ModelStore` contract address. |
+| `--registry-addr` |   | live address | Override `Registry` contract address. |
+| `--nft-addr` |   | live address | Override `NFT` contract address. |
+
+### `.env` file
+
+```bash
+PRIVATE_KEY=0x...                       # wallet with L1 for gas + deploy fee
+GAS_PRICE_GWEI=1                        # gas price for every transaction
+RPC_URL=https://rpc.genesisl1.org       # optional; default if not set
+```
+
+### Interactive prompts
+
+Whatever isn't auto-filled from the `GL1X` footer is asked at the terminal:
+
+- **Title** — ≥ 3 chars, must contain ≥ 1 word ≥ 2 chars (used to build the on-chain title-word search index via `keccak256(lowercased word)`).
+- **Description** — ≥ 8 chars.
+- **Icon** — path to a PNG, validated as exactly **128×128** with a correct PNG signature.
+- **Pricing mode + fee + recipient** — confirms `--pricing-mode` settings.
+- **License + ToS acceptance** — must type the *exact* license name and acceptance phrase, no `Y/N` shortcut (mirrors the UI's "I have read and accept" affordance — the on-chain record stores both `licenseIdAccepted` and `tosVersionAccepted`).
+
+### Footer-aware metadata
+
+When the `.gl1f` carries a `GL1X` JSON footer — which both the Python and C++ trainers in this repo emit by default, only `--no-package` suppresses it:
+
+- The on-chain `featuresPacked` string is taken **verbatim** from `pkg.nft.featuresPacked`, so the deployed metadata is byte-identical to what the trainer constructed (same task, same feature-name order, same label-name and class-label ordering).
+- `pkg.nft.title`, `pkg.nft.description`, and `pkg.nft.iconPngB64` (if present) are offered as **defaults in the prompts** — press Enter to accept, type a new value to override.
+- A sanity check verifies the footer's feature-name count matches the model header's `nFeatures`; mismatched footers are rejected outright, not silently overridden.
+
+The corresponding `--task` / `--label-name` / `--feature-names-file` flags are only consulted when the footer is absent or its `featuresPacked` is missing/malformed. If neither is available, feature names fall back to placeholders `feat_0..feat_{n-1}` (a warning is printed; these placeholders are permanently embedded in the NFT).
+
+## Outputs (artifacts)
+
+Three files written to the current working directory:
+
+| File | Purpose |
+|---|---|
+| `mint_state.json` | Per-chunk progress: pointer for each completed chunk, table pointer, register-tx hash. Used by `--resume`. **Do not delete mid-mint.** |
+| `owner_key.txt` | Freshly-generated owner API keypair. Required for off-chain ownership operations on the model. **Back this up immediately** — it is not recoverable. |
+| `S1.json` | **Supplementary Table S1.** Every on-chain identifier of the deployment: `modelId`, `tokenId`, all chunk pointers, table pointer, register-tx hash + block number, deployer address, owner-key address, model header fields, SHA-256 of the core bytes, `licenseIdAccepted`, `tosVersionAccepted`, pricing config, chain id, RPC, feature names. Designed to be cited verbatim in a paper. |
+
+`S1.json` is the canonical reproducibility witness: anyone with the file can independently verify that the same `.gl1f` (matching `core_sha256` and `model_id`) was deployed to the exact contracts on chainId 29.
+
+## Reliability
+
+- **Per-tx retry with gas bump.** If a transaction is not confirmed within `TX_TIMEOUT_SECONDS = 90 s`, the script resubmits with `gasPrice × 1.25`, up to 5 times per chunk.
+- **Receipt polling at 2 s intervals.**
+- **Resumable.** State is persisted after every successful chunk; `--resume` skips already-confirmed chunks by pointer.
+- **Chain-id guard.** Refuses to send anything if connected to a chain other than `chainId = 29` (GenesisL1).
+- **Wei-exact deploy fee.** `requiredDeployFeeWei(totalBytes)` is read fresh from the registry on every run — no stale fee math.
+
+## Usage
+
+### Mint a `.gl1f` with a `GL1X` footer (typical case)
+
+```bash
+python model_mint.py --gl1f path/to/model.gl1f
+```
+
+Task, feature names, label name, and optional title/description/icon are auto-extracted from the footer. Only fee and license-acceptance prompts remain.
+
+### Mint a paid-inference model
+
+```bash
+python model_mint.py \
+    --gl1f path/to/model.gl1f \
+    --pricing-mode 2 \
+    --pricing-fee-eth 0.005 \
+    --pricing-recipient 0xYourCollectorAddress
+```
+
+### Resume an interrupted mint
+
+```bash
+python model_mint.py --gl1f path/to/model.gl1f --resume
+```
+
+Reads `mint_state.json` in cwd, skips chunks whose pointers are already recorded, and picks up at the first missing chunk.
+
+### Dry run (CI / pre-flight)
+
+```bash
+python model_mint.py --gl1f path/to/model.gl1f --dry-run
+```
+
+Reads the model, computes `modelId`, validates the icon and metadata, reads registry state, encodes every transaction — but sends none. Use this to confirm a model is mintable before paying gas.
+
+### Footerless model with explicit metadata
+
+```bash
+python model_mint.py \
+    --gl1f path/to/legacy.gl1f \
+    --task binary_classification \
+    --label-name will_break_resistance \
+    --feature-names-file features.txt
+```
+
+## Dependencies
+
+```bash
+pip install web3 eth-account python-dotenv pillow
+```
+
+## Default contracts (GenesisL1 mainnet, chainId 29)
+
+| Contract | Address |
+|---|---|
+| ModelStore | `0x9CdbC23392648Bd27B4A5eD09c0fEa9452454B54` |
+| Registry   | `0x33c9844F77a07e36B98f0FFf8201B8A8b02c2a69` |
+| NFT        | `0x44Dc1c54B8D579B42d78cC21cf8260DC0A3279fA` |
+| Runtime    | `0xD2fD0cf461a6cb56Fc08d9aEc120833D8E79044E` |
+| Market     | `0xA9bfa0a719b7F73cE85CA1E7f23af626D383fB46` |
+
+All override-able via `--store-addr` / `--registry-addr` / `--nft-addr`.
+
+---
 
 ## License
 
