@@ -1,0 +1,3136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0a" id="metaThemeColor">
+<title>GenesisL1 Forest Trading Support Desk · 6 On-chain AI Models</title>
+<link rel="preconnect" href="https://fapi.binance.com" crossorigin>
+<link rel="preconnect" href="https://rpc.genesisl1.org" crossorigin>
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.4/ethers.umd.min.js" defer></script>
+<style>
+/* ═══════════════════════════════════════════════════════════════════════════
+ * DESIGN TOKENS — Bloomberg-inspired professional trading desk palette
+ * ═══════════════════════════════════════════════════════════════════════════ */
+:root {
+  --bg-0:        #0a0a0a;
+  --bg-1:        #111111;
+  --surface-1:   #161616;
+  --surface-2:   #1c1c1c;
+  --surface-3:   #232323;
+  --surface-4:   #2a2a2a;
+  --border-1:    #262626;
+  --border-2:    #303030;
+  --border-3:    #3f3f3f;
+  --text-1:      #ededed;
+  --text-2:      #b8b8b8;
+  --text-3:      #888888;
+  --text-4:      #525252;
+  --text-emph:   #ffffff;
+  --accent:      #ff6b35;       /* trading-desk orange */
+  --accent-hover:#ff7b48;
+  --accent-fg:   #000000;
+  --up:          #00d96e;
+  --up-dim:      rgba(0, 217, 110, 0.18);
+  --down:        #ff4646;
+  --down-dim:    rgba(255, 70, 70, 0.18);
+  --warn:        #ffb547;
+  --info:        #5aa4ff;
+  --radius-sm:   6px;
+  --radius-md:   8px;
+  --radius-lg:   12px;
+  --font-sans:   -apple-system, BlinkMacSystemFont, "Inter", "Helvetica Neue", Arial, sans-serif;
+  --font-mono:   "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+  --shadow-card: 0 1px 0 rgba(255,255,255,0.04), 0 4px 12px rgba(0,0,0,0.25);
+  --tape-up:     #00d96e;
+  --tape-dn:     #ff4646;
+  --tape-flat:   #777;
+}
+[data-theme="light"] {
+  --bg-0:        #f8f8f7;
+  --bg-1:        #ffffff;
+  --surface-1:   #ffffff;
+  --surface-2:   #f3f3f1;
+  --surface-3:   #e8e8e6;
+  --surface-4:   #dadad8;
+  --border-1:    #e0e0de;
+  --border-2:    #d0d0ce;
+  --border-3:    #b8b8b6;
+  --text-1:      #1a1a1a;
+  --text-2:      #525252;
+  --text-3:      #767676;
+  --text-4:      #a0a0a0;
+  --text-emph:   #000000;
+  --accent:      #ff5722;
+  --accent-hover:#ff6633;
+  --up:          #007e3f;
+  --up-dim:      rgba(0, 126, 63, 0.10);
+  --down:        #c81e1e;
+  --down-dim:    rgba(200, 30, 30, 0.10);
+}
+
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0;
+  background: var(--bg-0);
+  color: var(--text-1);
+  font-family: var(--font-sans);
+  font-size: 14px; line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.005em;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * APP CHROME
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.app-bar {
+  position: sticky; top: 0; z-index: 100;
+  background: var(--bg-1);
+  border-bottom: 1px solid var(--border-1);
+  backdrop-filter: blur(8px);
+}
+.app-bar-inner {
+  max-width: 1600px; margin: 0 auto;
+  padding: 0 24px;
+  display: flex; align-items: center; gap: 24px; height: 56px;
+}
+.brand {
+  display: flex; align-items: center; gap: 12px;
+  font-weight: 600; font-size: 14.5px;
+  color: var(--text-emph); letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+.brand-mark {
+  width: 40px; height: 24px;
+  border-radius: 4px;
+  /* Green fill + bold red frame — the signature GL1F brand mark */
+  background: var(--up);
+  border: 2px solid var(--down);
+  display: flex; align-items: center; justify-content: center;
+  color: #fff;
+  font-family: var(--font-mono); font-weight: 800; font-size: 11px;
+  letter-spacing: 0.04em;
+  text-shadow: 0 1px 0 rgba(0,0,0,0.35);
+  flex-shrink: 0;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.5) inset;
+}
+.brand-sub {
+  color: var(--text-3); font-weight: 400;
+  font-family: var(--font-mono); font-size: 12px;
+  margin-left: 10px;
+}
+
+.tape {
+  flex: 1; overflow: hidden;
+  display: flex; align-items: center; gap: 28px;
+  font-family: var(--font-mono); font-size: 12.5px;
+  color: var(--text-2);
+  white-space: nowrap;
+  mask-image: linear-gradient(to right, transparent 0, #000 32px, #000 calc(100% - 32px), transparent 100%);
+}
+.tape-item { display: inline-flex; align-items: center; gap: 6px; }
+.tape-sym { color: var(--text-3); font-weight: 500; }
+.tape-px { color: var(--text-1); }
+.tape-chg { font-weight: 500; }
+.tape-chg.up { color: var(--tape-up); }
+.tape-chg.dn { color: var(--tape-dn); }
+
+.app-bar-actions { display: flex; align-items: center; gap: 8px; }
+.icon-btn {
+  width: 36px; height: 36px;
+  display: flex; align-items: center; justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text-2);
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+.icon-btn:hover { background: var(--surface-2); color: var(--text-1); border-color: var(--border-1); }
+
+/* ───────── TAB BAR ───────── */
+.tab-bar {
+  background: var(--bg-1);
+  border-bottom: 1px solid var(--border-1);
+  position: sticky; top: 56px; z-index: 90;
+}
+.tab-bar-inner {
+  max-width: 1600px; margin: 0 auto;
+  padding: 0 24px;
+  display: flex; align-items: center; gap: 2px;
+  overflow-x: auto;
+  height: 44px;
+}
+.tab {
+  padding: 10px 18px;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--text-3);
+  font-family: var(--font-sans); font-size: 13.5px; font-weight: 500;
+  letter-spacing: -0.005em;
+  cursor: pointer; white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 8px;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+.tab:hover { color: var(--text-1); }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tab-sub-num {
+  font-family: var(--font-mono); font-size: 11px;
+  background: var(--surface-2); color: var(--text-3);
+  padding: 1px 6px; border-radius: 4px;
+  font-weight: 600;
+}
+.tab.active .tab-sub-num { background: var(--surface-3); color: var(--text-1); }
+
+/* ───────── SUB-TAB BAR (asset selector inside tabs) ───────── */
+.subtab-bar {
+  background: var(--bg-0);
+  padding: 16px 24px 0;
+  max-width: 1600px; margin: 0 auto;
+  display: flex; gap: 4px; flex-wrap: wrap;
+}
+.subtab {
+  padding: 8px 16px;
+  background: var(--surface-1);
+  border: 1px solid var(--border-1);
+  border-radius: 980px;
+  color: var(--text-2);
+  font-family: var(--font-sans); font-size: 12.5px; font-weight: 500;
+  cursor: pointer;
+  display: inline-flex; align-items: center; gap: 8px;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+.subtab:hover { background: var(--surface-2); color: var(--text-1); }
+.subtab.active {
+  background: var(--surface-3); color: var(--text-emph);
+  border-color: var(--border-3);
+}
+.subtab .asset-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  display: inline-block;
+}
+.subtab[data-asset="eth"] .asset-dot { background: #627eea; }
+.subtab[data-asset="xrp"] .asset-dot { background: #00aae4; }
+.subtab[data-asset="zec"] .asset-dot { background: #f4b728; }
+.subtab[data-model="eth-up"] .asset-dot,
+.subtab[data-model="xrp-up"] .asset-dot,
+.subtab[data-model="zec-up"] .asset-dot { background: var(--up); }
+.subtab[data-model="eth-dn"] .asset-dot,
+.subtab[data-model="xrp-dn"] .asset-dot,
+.subtab[data-model="zec-dn"] .asset-dot { background: var(--down); }
+
+/* ───────── MAIN CONTAINER ───────── */
+.app {
+  max-width: 1600px; margin: 0 auto;
+  padding: 24px;
+}
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+.subtab-panel { display: none; }
+.subtab-panel.active { display: block; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * CARDS / GRID
+ * ═══════════════════════════════════════════════════════════════════════════ */
+.card {
+  background: var(--surface-1);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+}
+.card + .card { margin-top: 16px; }
+
+.card-head {
+  padding: 14px 20px;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--border-1);
+  background: linear-gradient(to bottom, var(--surface-2), var(--surface-1));
+}
+.card-title {
+  font-size: 13.5px; font-weight: 600;
+  color: var(--text-emph); letter-spacing: -0.005em;
+  display: inline-flex; align-items: center; gap: 8px;
+}
+.card-sub {
+  font-family: var(--font-mono); font-size: 11.5px;
+  color: var(--text-3); letter-spacing: 0.005em;
+}
+.card-sub.up { color: var(--up); }
+.card-sub.dn { color: var(--down); }
+
+.kbd-hint {
+  font-family: var(--font-mono); font-size: 10.5px;
+  color: var(--text-3);
+  padding: 1px 5px;
+  background: var(--surface-3);
+  border: 1px solid var(--border-2);
+  border-radius: 3px;
+  letter-spacing: 0.02em;
+}
+
+/* ───────── OVERVIEW: ASSET ROWS ───────── */
+.asset-row {
+  display: grid;
+  /* 5 columns: id | up | dn | bias | exec */
+  grid-template-columns: 200px minmax(0,1fr) minmax(0,1fr) 190px 215px;
+  gap: 0;
+}
+.asset-pane {
+  padding: 18px 20px;
+  border-right: 1px solid var(--border-1);
+  display: flex; flex-direction: column;
+  justify-content: center;
+}
+.asset-pane:last-child { border-right: 0; }
+
+.asset-id {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 8px;
+}
+.asset-id-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+}
+.asset-id .asset-name {
+  font-size: 14px; font-weight: 600; color: var(--text-emph);
+  letter-spacing: -0.005em;
+}
+.asset-id .asset-sym {
+  font-family: var(--font-mono); font-size: 11px;
+  color: var(--text-3);
+  margin-left: auto;
+}
+.asset-price {
+  font-family: var(--font-mono); font-size: 24px; font-weight: 600;
+  color: var(--text-emph); letter-spacing: -0.015em;
+  font-variant-numeric: tabular-nums;
+}
+.asset-meta {
+  display: flex; gap: 16px; margin-top: 6px;
+  font-family: var(--font-mono); font-size: 11px;
+  color: var(--text-3);
+}
+.asset-meta dt { color: var(--text-4); margin-right: 4px; }
+.asset-meta dd { margin: 0; color: var(--text-2); display: inline; }
+
+/* per-side panes (up / dn) */
+.side-pane {
+  position: relative;
+  padding: 18px 20px;
+}
+.side-pane.up { background: linear-gradient(to bottom, transparent, var(--up-dim)); }
+.side-pane.dn { background: linear-gradient(to bottom, transparent, var(--down-dim)); }
+.side-pane .side-label {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; font-weight: 600;
+  letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--text-3);
+  margin-bottom: 4px;
+}
+.side-pane.up .side-label { color: var(--up); }
+.side-pane.dn .side-label { color: var(--down); }
+.side-pane .prob-val {
+  font-family: var(--font-mono); font-size: 30px; font-weight: 600;
+  color: var(--text-emph); letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+.side-pane .prob-sub {
+  margin-top: 4px;
+  font-family: var(--font-mono); font-size: 11px;
+  color: var(--text-3);
+}
+.side-pane .classification {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 2px 8px;
+  border-radius: 980px;
+  font-family: var(--font-mono); font-size: 10.5px; font-weight: 600;
+  letter-spacing: 0.04em; text-transform: uppercase;
+  background: var(--surface-3); color: var(--text-2);
+  border: 1px solid var(--border-2);
+}
+.classification.below    { background: var(--surface-3); color: var(--text-3); border-color: var(--border-2); }
+.classification.weak     { background: rgba(255, 181, 71, 0.15); color: var(--warn); border-color: rgba(255, 181, 71, 0.3); }
+.classification.indeter  { background: rgba(90, 164, 255, 0.15); color: var(--info); border-color: rgba(90, 164, 255, 0.3); }
+.classification.elevated.up,
+.classification.high.up  { background: var(--up-dim); color: var(--up); border-color: var(--up); }
+.classification.elevated.dn,
+.classification.high.dn  { background: var(--down-dim); color: var(--down); border-color: var(--down); }
+
+.bias-pane {
+  padding: 18px 20px;
+  display: flex; flex-direction: column;
+  align-items: flex-end; justify-content: center;
+  gap: 6px;
+}
+.bias-pill {
+  padding: 4px 12px;
+  border-radius: 980px;
+  font-family: var(--font-mono); font-size: 12px; font-weight: 600;
+  border: 1px solid var(--border-2);
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.bias-pill.long  { color: var(--up); background: var(--up-dim);   border-color: var(--up); }
+.bias-pill.short { color: var(--down); background: var(--down-dim); border-color: var(--down); }
+.bias-pill.neutral { color: var(--text-3); background: var(--surface-2); }
+.bias-targets {
+  font-family: var(--font-mono); font-size: 10.5px;
+  color: var(--text-3); text-align: right;
+}
+.bias-targets dt { color: var(--text-4); display: inline; }
+.bias-targets dd { display: inline; margin: 0 0 0 6px; color: var(--text-2); }
+
+/* per-row Execute button column (replaces the global "run all" button) */
+.exec-pane {
+  padding: 16px 18px;
+  border-left: 1px solid var(--border-1);
+  display: flex; flex-direction: column;
+  align-items: stretch; justify-content: center;
+  gap: 8px;
+}
+.exec-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: 8px;
+  padding: 11px 14px;
+  background: linear-gradient(to bottom, var(--surface-3), var(--surface-2));
+  border: 1px solid var(--border-3);
+  border-radius: var(--radius-sm);
+  color: var(--text-emph);
+  font-family: var(--font-sans); font-size: 12px; font-weight: 600;
+  letter-spacing: 0.005em; cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, transform 80ms ease;
+  user-select: none;
+  white-space: nowrap;
+}
+.exec-btn:hover {
+  background: linear-gradient(to bottom, var(--surface-4), var(--surface-3));
+  border-color: var(--accent);
+}
+.exec-btn:active:not(:disabled) { transform: scale(0.98); }
+.exec-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  border-color: var(--border-2);
+}
+.exec-btn .exec-ico {
+  font-family: var(--font-mono); font-size: 12px;
+  color: var(--accent);
+}
+.exec-btn.running .exec-ico {
+  animation: exec-spin 1s linear infinite;
+}
+@keyframes exec-spin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
+.exec-status {
+  font-family: var(--font-mono); font-size: 10.5px;
+  color: var(--text-3); text-align: center;
+  letter-spacing: 0.02em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.exec-status.ok    { color: var(--up); }
+.exec-status.err   { color: var(--down); }
+.exec-status.live  { color: var(--accent); font-weight: 600; }
+
+@media (max-width: 1280px) {
+  .asset-row { grid-template-columns: 200px minmax(0,1fr) minmax(0,1fr) 150px; }
+  .exec-pane {
+    grid-column: 1 / -1;
+    border-left: 0; border-top: 1px solid var(--border-1);
+    flex-direction: row; align-items: center; justify-content: flex-end;
+    padding: 12px 18px;
+  }
+  .exec-btn { padding: 9px 16px; min-width: 220px; }
+  .exec-status { text-align: right; }
+}
+@media (max-width: 900px) {
+  .asset-row { grid-template-columns: 1fr 1fr; }
+  .asset-pane { border-right: 0; border-bottom: 1px solid var(--border-1); }
+  .side-pane:nth-child(3) { border-right: 1px solid var(--border-1); }
+  .bias-pane { grid-column: 1 / -1; align-items: flex-start; border-top: 1px solid var(--border-1); }
+}
+
+/* ───────── OVERVIEW: ACTIONS ROW ───────── */
+.actions-row {
+  display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.btn {
+  padding: 9px 16px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-sm);
+  color: var(--text-1);
+  font-family: var(--font-sans); font-size: 13px; font-weight: 500;
+  letter-spacing: -0.005em; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 8px;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+.btn:hover { background: var(--surface-3); border-color: var(--border-3); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn.primary {
+  background: var(--accent); color: var(--accent-fg);
+  border-color: var(--accent);
+}
+.btn.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+.btn .btn-ico {
+  font-family: var(--font-mono); font-size: 12px; font-weight: 700;
+}
+.actions-status {
+  margin-left: auto;
+  font-family: var(--font-mono); font-size: 11.5px;
+  color: var(--text-3);
+}
+.actions-status .ok { color: var(--up); }
+.actions-status .err { color: var(--down); }
+
+/* ───────── BACKTEST / INFERENCE / HISTORY containers (full-width card with built-in scroll) ───────── */
+.scroll-card {
+  max-height: 70vh;
+  overflow: auto;
+}
+.scroll-card::-webkit-scrollbar { width: 10px; height: 10px; }
+.scroll-card::-webkit-scrollbar-track { background: transparent; }
+.scroll-card::-webkit-scrollbar-thumb {
+  background: var(--surface-3);
+  border: 2px solid var(--surface-1);
+  border-radius: 980px;
+}
+.scroll-card::-webkit-scrollbar-thumb:hover { background: var(--border-3); }
+
+/* ───────── HISTORY TABLE (per-asset) ───────── */
+.hist-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12.5px;
+}
+.hist-table thead th {
+  position: sticky; top: 0; z-index: 1;
+  text-align: left;
+  padding: 11px 16px;
+  font-family: var(--font-sans);
+  font-size: 11px; font-weight: 600;
+  letter-spacing: 0.02em; text-transform: uppercase;
+  color: var(--text-3);
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border-2);
+}
+.hist-table th.num { text-align: right; }
+.hist-table tbody td {
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border-1);
+  color: var(--text-2);
+}
+.hist-table tbody td.num { text-align: right; }
+.hist-table tbody td.time { color: var(--text-3); }
+.hist-table tbody tr:hover { background: var(--surface-2); }
+.hist-table td.prob.below   { color: var(--text-3); }
+.hist-table td.prob.weak    { color: var(--warn); }
+.hist-table td.prob.indeter { color: var(--info); }
+.hist-table td.prob.elevated, .hist-table td.prob.high { color: var(--text-emph); font-weight: 600; }
+.hist-table td.bias.up   { color: var(--up);   font-weight: 600; }
+.hist-table td.bias.down { color: var(--down); font-weight: 600; }
+.hist-empty {
+  padding: 32px 24px; text-align: center;
+  color: var(--text-3); font-size: 13px;
+}
+
+.hist-meta {
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border-1);
+  font-family: var(--font-mono); font-size: 11.5px;
+  color: var(--text-3);
+  display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px;
+}
+.hist-meta .meta-val { color: var(--text-1); }
+
+/* ───────── HISTORICAL INFERENCE FORM ───────── */
+.inspect-body { padding: 20px 24px; }
+.inspect-controls {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+  margin-bottom: 12px;
+}
+.inspect-field { display: flex; flex-direction: column; gap: 6px; }
+.inspect-field label {
+  font-size: 11px; font-weight: 600;
+  color: var(--text-3);
+  letter-spacing: 0.04em; text-transform: uppercase;
+  display: flex; align-items: center; gap: 6px;
+}
+.inspect-field .utc-chip {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 9.5px; font-weight: 600;
+  color: var(--text-3);
+  background: var(--surface-2);
+  border: 1px solid var(--border-1);
+  padding: 1px 5px; border-radius: 3px;
+  letter-spacing: 0.04em;
+}
+.inspect-field input {
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-sm);
+  color: var(--text-1);
+  font-family: var(--font-mono);
+  font-size: 13px; font-variant-numeric: tabular-nums;
+  color-scheme: dark;
+}
+[data-theme="light"] .inspect-field input { color-scheme: light; }
+.inspect-field input:focus { outline: none; border-color: var(--border-3); background: var(--surface-3); }
+.inspect-quick {
+  display: flex; gap: 6px; flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.inspect-quick-btn {
+  padding: 5px 10px;
+  background: var(--surface-1);
+  border: 1px solid var(--border-1);
+  border-radius: 980px;
+  color: var(--text-2);
+  font-family: var(--font-mono); font-size: 11px; font-weight: 500;
+  cursor: pointer;
+}
+.inspect-quick-btn:hover { background: var(--surface-2); color: var(--text-1); border-color: var(--border-2); }
+
+.inspect-resolved {
+  margin: 6px 0 14px;
+  font-family: var(--font-mono); font-size: 12px;
+  color: var(--text-3);
+}
+.inspect-resolved.error { color: var(--down); }
+
+.inspect-result {
+  margin-top: 16px;
+  padding: 18px 20px;
+  background: var(--surface-2);
+  border-radius: var(--radius-md);
+  border-left: 3px solid var(--border-2);
+  display: none;
+}
+.inspect-result.active { display: block; }
+.inspect-result .row {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+  margin-bottom: 12px;
+}
+.inspect-result .prob-cell {
+  padding: 12px 14px;
+  background: var(--surface-1);
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--border-2);
+}
+.inspect-result .prob-cell.up { border-left-color: var(--up); }
+.inspect-result .prob-cell.dn { border-left-color: var(--down); }
+.inspect-result .prob-cell .lbl {
+  font-size: 10.5px; font-weight: 600;
+  color: var(--text-3);
+  letter-spacing: 0.04em; text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.inspect-result .prob-cell .val {
+  font-family: var(--font-mono); font-size: 24px; font-weight: 600;
+  color: var(--text-emph);
+  font-variant-numeric: tabular-nums;
+}
+.inspect-result .prob-cell .det {
+  font-family: var(--font-mono); font-size: 11px;
+  color: var(--text-3); margin-top: 2px;
+}
+.inspect-result .meta {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px 18px;
+  font-family: var(--font-mono); font-size: 11.5px;
+  margin-top: 12px;
+  padding: 12px;
+  background: var(--bg-1);
+  border-radius: var(--radius-sm);
+}
+.inspect-result .meta dt { color: var(--text-3); }
+.inspect-result .meta dd { color: var(--text-1); margin: 0 0 6px 0; }
+.inspect-result .outcome {
+  margin-top: 12px;
+  padding: 10px 14px;
+  background: var(--surface-1);
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--text-4);
+  font-size: 12.5px;
+}
+.inspect-result .outcome.full-up   { border-left-color: var(--up); }
+.inspect-result .outcome.full-dn   { border-left-color: var(--down); }
+.inspect-result .outcome.partial   { border-left-color: var(--warn); }
+.inspect-result .outcome.miss      { border-left-color: var(--text-3); }
+.inspect-result .outcome.pending   { border-left-color: var(--text-4); }
+.inspect-result .outcome .o-label {
+  font-weight: 600; color: var(--text-emph);
+  letter-spacing: -0.005em;
+  font-family: var(--font-sans);
+}
+
+/* ───────── MODELS TAB ───────── */
+.models-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+  gap: 16px;
+}
+.model-card {
+  padding: 0;
+  position: relative;
+  border-top: 3px solid var(--border-2);
+}
+.model-card.up { border-top-color: var(--up); }
+.model-card.dn { border-top-color: var(--down); }
+.model-card .card-head {
+  background: transparent;
+  border-bottom: 1px solid var(--border-1);
+}
+.model-card .model-body { padding: 18px 20px; }
+.model-perf {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.model-perf .cell {
+  padding: 10px 12px;
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+}
+.model-perf .cell dt {
+  font-size: 10.5px; font-weight: 600;
+  color: var(--text-3);
+  letter-spacing: 0.04em; text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.model-perf .cell dd {
+  font-family: var(--font-mono); font-size: 18px; font-weight: 600;
+  color: var(--text-emph);
+  font-variant-numeric: tabular-nums;
+  margin: 0;
+}
+.model-perf .cell .note {
+  font-family: var(--font-mono); font-size: 10.5px;
+  color: var(--text-3); margin-top: 2px;
+}
+.model-spec {
+  display: grid; grid-template-columns: max-content 1fr;
+  gap: 6px 16px;
+  font-family: var(--font-mono); font-size: 12px;
+}
+.model-spec dt { color: var(--text-3); }
+.model-spec dd { color: var(--text-1); margin: 0; }
+.model-spec dd.hash {
+  font-size: 10.5px;
+  color: var(--text-2);
+  word-break: break-all;
+}
+.model-spec dd.barriers .ts { color: var(--up); }
+.model-spec dd.barriers .ss { color: var(--down); }
+
+/* ───────── ABOUT ON-CHAIN AI ───────── */
+.about-card { max-width: 1100px; margin: 0 auto; }
+.about-body {
+  padding: 28px 36px 36px;
+}
+.about-section { margin-bottom: 32px; }
+.about-section:last-child { margin-bottom: 0; }
+.about-section h2 {
+  font-size: 17px; font-weight: 600;
+  color: var(--text-emph); letter-spacing: -0.012em;
+  margin: 0 0 12px 0;
+}
+.about-section h3 {
+  font-size: 13.5px; font-weight: 600;
+  color: var(--text-emph);
+  margin: 0 0 8px 0; letter-spacing: -0.005em;
+}
+.about-section p {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--text-2);
+}
+.about-section p:last-child { margin-bottom: 0; }
+.about-section a {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color 120ms ease;
+}
+.about-section a:hover { border-bottom-color: var(--accent); }
+.about-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.about-cell {
+  padding: 18px 20px;
+  background: var(--surface-2);
+  border-radius: var(--radius-md);
+  border-left: 3px solid var(--accent);
+}
+.about-cell p { margin: 0; font-size: 13.5px; line-height: 1.6; }
+.about-flow {
+  list-style: none; padding: 0; margin: 0;
+  counter-reset: step;
+}
+.about-flow li {
+  position: relative;
+  padding: 14px 16px 14px 56px;
+  margin-bottom: 10px;
+  background: var(--surface-2);
+  border-radius: var(--radius-md);
+  border-left: 3px solid var(--border-2);
+}
+.about-flow li:before {
+  counter-increment: step;
+  content: counter(step);
+  position: absolute;
+  left: 16px; top: 14px;
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: var(--accent); color: var(--accent-fg);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono); font-size: 13px; font-weight: 700;
+}
+.about-flow .step-label {
+  display: block;
+  font-weight: 600; color: var(--text-emph);
+  font-size: 13.5px; margin-bottom: 4px;
+  letter-spacing: -0.005em;
+}
+.about-flow .step-desc {
+  display: block;
+  font-size: 13px; line-height: 1.6;
+  color: var(--text-2);
+}
+.about-do-not, .about-tab-guide, .about-bullets {
+  margin: 0; padding: 0; list-style: none;
+}
+.about-do-not li, .about-tab-guide li, .about-bullets li {
+  padding: 12px 16px;
+  margin-bottom: 8px;
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+  font-size: 13.5px; line-height: 1.6;
+  color: var(--text-2);
+  border-left: 3px solid var(--border-2);
+}
+.about-do-not li    { border-left-color: var(--warn); }
+.about-tab-guide li { border-left-color: var(--info); }
+.about-bullets li   { border-left-color: var(--up); }
+.about-do-not strong, .about-tab-guide strong, .about-bullets strong {
+  color: var(--text-emph);
+  font-weight: 600;
+}
+.about-links {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+.about-link {
+  display: flex !important; flex-direction: column; gap: 4px;
+  padding: 16px 18px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-md);
+  border-bottom: 1px solid var(--border-2) !important;  /* override hover underline */
+  transition: background 140ms ease, border-color 140ms ease, transform 140ms ease;
+}
+.about-link:hover {
+  background: var(--surface-3);
+  border-color: var(--accent) !important;
+  transform: translateY(-1px);
+}
+.about-link-title {
+  font-family: var(--font-sans);
+  font-size: 14px; font-weight: 600;
+  color: var(--text-emph);
+  letter-spacing: -0.005em;
+}
+.about-link-host {
+  font-family: var(--font-mono); font-size: 11.5px;
+  color: var(--text-3);
+}
+@media (max-width: 768px) {
+  .about-body { padding: 20px 18px 28px; }
+  .about-grid { grid-template-columns: 1fr; }
+}
+
+/* ───────── MODAL / TOAST ───────── */
+.toast {
+  position: fixed; bottom: 24px; right: 24px;
+  background: var(--surface-3);
+  border: 1px solid var(--border-3);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  font-family: var(--font-mono); font-size: 12.5px;
+  color: var(--text-1);
+  box-shadow: var(--shadow-card);
+  z-index: 200;
+  opacity: 0; transform: translateY(8px);
+  pointer-events: none;
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+.toast.visible { opacity: 1; transform: translateY(0); pointer-events: auto; }
+.toast.error  { border-color: var(--down); color: var(--down); }
+.toast.ok     { border-color: var(--up);   color: var(--up); }
+
+/* ───────── DISCLAIMER FOOTER ───────── */
+.footer {
+  max-width: 1600px; margin: 0 auto;
+  padding: 24px;
+  font-family: var(--font-mono); font-size: 11px;
+  color: var(--text-4);
+  line-height: 1.6;
+  border-top: 1px solid var(--border-1);
+  margin-top: 32px;
+}
+.footer .legend {
+  display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 8px;
+}
+.footer .legend-item { color: var(--text-3); }
+.footer .disclaimer { max-width: 900px; }
+
+/* generic util */
+.row { display: flex; gap: 12px; align-items: center; }
+.spacer { flex: 1; }
+.muted { color: var(--text-3); }
+.mono  { font-family: var(--font-mono); }
+.hidden { display: none !important; }
+.term  { font-weight: 600; color: var(--text-emph); }
+code { font-family: var(--font-mono); font-size: 12px; background: var(--surface-2); padding: 1px 5px; border-radius: 3px; color: var(--text-1); }
+
+@media (max-width: 768px) {
+  .app, .app-bar-inner, .tab-bar-inner, .subtab-bar { padding-left: 16px; padding-right: 16px; }
+  .brand-sub { display: none; }
+  .tape { display: none; }
+  .inspect-controls { grid-template-columns: 1fr; }
+  .models-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<header class="app-bar">
+  <div class="app-bar-inner">
+    <div class="brand">
+      <div class="brand-mark">GL1F</div>
+      <span>GenesisL1 Forest Trading Support Desk</span>
+      <span class="brand-sub">6 on-chain AI models · GenesisL1 · ch29</span>
+    </div>
+    <div class="tape" id="tape">
+      <!-- populated dynamically with latest prices -->
+    </div>
+    <div class="app-bar-actions">
+      <button class="icon-btn" id="themeToggle" title="Toggle theme">
+        <span class="theme-icon-sun">☀</span>
+        <span class="theme-icon-moon" style="display:none;">☾</span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<nav class="tab-bar">
+  <div class="tab-bar-inner">
+    <button class="tab active" data-tab="overview">
+      <span>Web3 AI Desk</span>
+      <span class="tab-sub-num">6</span>
+    </button>
+    <button class="tab" data-tab="backtest">
+      <span>Backtest</span>
+    </button>
+    <button class="tab" data-tab="history">
+      <span>Predictions history</span>
+    </button>
+    <button class="tab" data-tab="inference">
+      <span>Blockchain inference</span>
+    </button>
+    <button class="tab" data-tab="models">
+      <span>On-chain AI models</span>
+      <span class="tab-sub-num">6</span>
+    </button>
+    <button class="tab" data-tab="about">
+      <span>About on-chain AI</span>
+    </button>
+  </div>
+</nav>
+
+<main class="app">
+  <!-- ═══════ OVERVIEW TAB ═══════ -->
+  <section class="tab-panel active" id="panel-overview">
+    <div class="actions-row">
+      <div class="actions-status" id="overviewStatus">Loading latest snapshots…</div>
+    </div>
+    <!-- 3 asset rows, each with its own Execute button -->
+    <div id="overviewRows"></div>
+  </section>
+
+  <!-- ═══════ BACKTEST TAB ═══════ -->
+  <section class="tab-panel" id="panel-backtest">
+    <div class="subtab-bar" data-subtab-group="backtest">
+      <button class="subtab active" data-asset="eth"><span class="asset-dot"></span>ETH</button>
+      <button class="subtab" data-asset="xrp"><span class="asset-dot"></span>XRP</button>
+      <button class="subtab" data-asset="zec"><span class="asset-dot"></span>ZEC</button>
+    </div>
+    <div id="backtestPanes" style="margin-top: 16px;">
+      <div class="subtab-panel active" data-asset="eth" id="backtest-eth"></div>
+      <div class="subtab-panel" data-asset="xrp" id="backtest-xrp"></div>
+      <div class="subtab-panel" data-asset="zec" id="backtest-zec"></div>
+    </div>
+  </section>
+
+  <!-- ═══════ HISTORY TAB ═══════ -->
+  <section class="tab-panel" id="panel-history">
+    <div class="subtab-bar" data-subtab-group="history">
+      <button class="subtab active" data-asset="eth"><span class="asset-dot"></span>ETH</button>
+      <button class="subtab" data-asset="xrp"><span class="asset-dot"></span>XRP</button>
+      <button class="subtab" data-asset="zec"><span class="asset-dot"></span>ZEC</button>
+    </div>
+    <div id="historyPanes" style="margin-top: 16px;">
+      <div class="subtab-panel active" data-asset="eth" id="history-eth"></div>
+      <div class="subtab-panel" data-asset="xrp" id="history-xrp"></div>
+      <div class="subtab-panel" data-asset="zec" id="history-zec"></div>
+    </div>
+  </section>
+
+  <!-- ═══════ HISTORICAL INFERENCE TAB ═══════ -->
+  <section class="tab-panel" id="panel-inference">
+    <div class="subtab-bar" data-subtab-group="inference">
+      <button class="subtab active" data-asset="eth"><span class="asset-dot"></span>ETH</button>
+      <button class="subtab" data-asset="xrp"><span class="asset-dot"></span>XRP</button>
+      <button class="subtab" data-asset="zec"><span class="asset-dot"></span>ZEC</button>
+    </div>
+    <div id="inferencePanes" style="margin-top: 16px;">
+      <div class="subtab-panel active" data-asset="eth" id="inference-eth"></div>
+      <div class="subtab-panel" data-asset="xrp" id="inference-xrp"></div>
+      <div class="subtab-panel" data-asset="zec" id="inference-zec"></div>
+    </div>
+  </section>
+
+  <!-- ═══════ MODELS TAB ═══════ -->
+  <section class="tab-panel" id="panel-models">
+    <div class="subtab-bar" data-subtab-group="models">
+      <button class="subtab active" data-model="all">All 6</button>
+      <button class="subtab" data-model="eth-up"><span class="asset-dot"></span>ETH ↑ #6</button>
+      <button class="subtab" data-model="eth-dn"><span class="asset-dot"></span>ETH ↓ #7</button>
+      <button class="subtab" data-model="xrp-up"><span class="asset-dot"></span>XRP ↑ #8</button>
+      <button class="subtab" data-model="xrp-dn"><span class="asset-dot"></span>XRP ↓ #9</button>
+      <button class="subtab" data-model="zec-up"><span class="asset-dot"></span>ZEC ↑ #10</button>
+      <button class="subtab" data-model="zec-dn"><span class="asset-dot"></span>ZEC ↓ #11</button>
+    </div>
+    <div id="modelsPanes" style="margin-top: 16px;">
+      <div class="models-grid" id="modelsGrid"></div>
+    </div>
+  </section>
+
+  <!-- ═══════ ABOUT ON-CHAIN AI TAB ═══════ -->
+  <section class="tab-panel" id="panel-about">
+    <article class="card about-card">
+      <header class="card-head">
+        <span class="card-title">About on-chain AI · how this reference dApp works</span>
+        <span class="card-sub">Deterministic ML inference inside an EVM transaction</span>
+      </header>
+      <div class="about-body">
+
+        <section class="about-section">
+          <h2>What you are looking at</h2>
+          <p>
+            This page is a <strong>reference implementation</strong> of trustless, fully on-chain machine-learning inference on the <a href="https://genesisl1.com" target="_blank" rel="noopener">GenesisL1</a> blockchain. Six independently trained gradient-boosted decision tree (GBDT) classifiers — three asset pairs of long/short models — are stored as on-chain NFTs on chain id 29. Their <em>weights</em>, <em>tree topology</em>, <em>split thresholds</em>, and <em>leaf values</em> live in contract storage, not on a private API or someone's GPU server. Any caller can submit a feature vector and receive a deterministic prediction by invoking <code>predictView(modelId, packedFeatures)</code> on the <span class="term">ForestRuntime</span> contract.
+          </p>
+          <p>
+            For a wider context on what this enables and where it's going, see the <a href="https://gl1f.com/gl1f_crypto_pitch_deck.html" target="_blank" rel="noopener">GL1F protocol pitch deck</a>, the <a href="https://genesisl1.com" target="_blank" rel="noopener">GenesisL1.com</a> chain documentation, and the <a href="https://l1coin.com" target="_blank" rel="noopener">L1coin.com</a> ecosystem page.
+          </p>
+        </section>
+
+        <section class="about-section">
+          <h2>The two innovations that matter</h2>
+          <div class="about-grid">
+            <div class="about-cell">
+              <h3>1. Trustless inference</h3>
+              <p>
+                Every node executing the EVM transaction runs the <em>same</em> traversal of the <em>same</em> tree ensemble against the <em>same</em> feature vector. They must agree on the output bit-for-bit, or the block doesn't validate. There is no "AI service" to trust — only the chain consensus rules. A model that signed off on a trade in 2026 will sign off on the identical input in 2030 with the identical output.
+              </p>
+            </div>
+            <div class="about-cell">
+              <h3>2. Public verifiable provenance</h3>
+              <p>
+                Each model is minted as an NFT. The token id, the model hash (a <code>bytes32</code> commitment to the full serialized model), the feature schema, the bin layout, and the quantization scale (<code>scaleQ = 10⁶</code>) are all on-chain reading. The author, mint time, and any version history are auditable. Nothing about how the model behaves can be silently changed.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section class="about-section">
+          <h2>How an inference flows</h2>
+          <ol class="about-flow">
+            <li>
+              <span class="step-label">Feature computation</span>
+              <span class="step-desc">The browser (or off-chain daemon) fetches recent OHLCV candles + funding-rate history from a market data source. From this it computes the model's input features locally — 33 strictly causal features for XRP/ZEC, 26 or 27 for ETH. Every operation uses only data observable at the candle's open time; there is no peek-ahead.</span>
+            </li>
+            <li>
+              <span class="step-label">Quantization & packing</span>
+              <span class="step-desc">Each feature is multiplied by <code>scaleQ = 10⁶</code>, rounded to <code>int32</code>, and packed in little-endian byte order in the schema's exact feature order. The result is a flat byte string handed to the contract.</span>
+            </li>
+            <li>
+              <span class="step-label">On-chain <code>eth_call</code></span>
+              <span class="step-desc">The dApp invokes <code>ForestRuntime.predictView(modelId, packedFeatures)</code> as a <em>view</em> call — gas is free, no transaction is mined, but execution is verified against the same EVM rules. The runtime contract walks the tree ensemble identified by <code>modelId</code>, descending each tree via the quantized feature thresholds, summing leaf values, and returning the raw logit as <code>int256</code>.</span>
+            </li>
+            <li>
+              <span class="step-label">Sigmoid &amp; presentation</span>
+              <span class="step-desc">The dApp divides the returned logit by <code>scaleQ</code> to recover a real number, applies <code>σ(x) = 1/(1+e<sup>−x</sup>)</code> to get a probability, and renders it. The same dApp can re-run any past candle (see Blockchain inference tab) or replay the full history (see Predictions history).</span>
+            </li>
+          </ol>
+        </section>
+
+        <section class="about-section">
+          <h2>GBDT: AI for tabular data</h2>
+          <p>
+            Gradient-boosted decision trees are the methodology of choice for predictive modeling on tabular data — the kind of data this dApp works with: OHLCV candles, funding rates, derived volatility and momentum features arranged as rows × columns. The model is an ensemble of shallow decision trees built sequentially, each one trained to correct the residual error of the trees that came before. The final prediction is the sum of every tree's contribution, then mapped through the sigmoid to yield a probability.
+          </p>
+          <p>
+            What makes GBDTs the right tool here:
+          </p>
+          <ul class="about-bullets">
+            <li><strong>Excellent on heterogeneous numeric features.</strong> Returns, volatility ratios, RSI, funding cumulants, hour-of-day, day-of-week — all of these live on different scales and have different relationships to the target. Trees handle this natively: each split is feature-local, so wildly different ranges and units coexist without preprocessing or normalization.</li>
+            <li><strong>Captures non-linear interactions automatically.</strong> The model can discover that "high RSI matters more when funding is elevated" without anyone hand-engineering the interaction term. Depth-7 to depth-9 trees explore conjunctions of up to ~7-9 conditions per leaf.</li>
+            <li><strong>Robust to noisy and sparse signals.</strong> Markets are mostly noise. Trees naturally regularize via shallow depth + small leaf counts, and the boosting framework keeps adding only the trees that demonstrably reduce out-of-sample error. With early stopping on a validation split, the trainer halts before overfitting the residuals.</li>
+            <li><strong>Interpretable per-feature attribution.</strong> Permutation importance and split-usage statistics (visible in the per-model spec sheets) show exactly which features the ensemble actually leans on. For ZEC upside the dominant signals are <code>ATR_ratio100</code> and <code>close_to_ema5</code>; for ZEC downside it's <code>hour</code> and <code>funding_cum_24h</code>. The model's behavior is auditable, not opaque.</li>
+            <li><strong>Deterministic at inference time.</strong> A trained tree is a fixed structure of integer comparisons against integer thresholds. With features quantized at <code>scaleQ = 10⁶</code> and stored in the same Q-format, the entire ensemble evaluates to a bit-exact output on every EVM client — which is what makes trustless on-chain verification possible at all.</li>
+            <li><strong>Compact and cheap to evaluate.</strong> The six models in this dApp range from 1,008 to 2,500 trees with serialized sizes between 2.7 MB and 9.5 MB on-chain. Inference is a tight loop of comparisons; a single <code>predictView</code> call returns in seconds on the GenesisL1 RPC.</li>
+          </ul>
+          <p>
+            Empirically, this combination delivers 60-65% logloss reductions against the naive class-prior baseline on held-out windows, with test accuracies of 93-96% across the six models (see the On-chain AI models tab for per-model numbers).
+          </p>
+        </section>
+
+        <section class="about-section">
+          <h2>What this dApp does NOT do</h2>
+          <ul class="about-do-not">
+            <li><strong>Training is off-chain.</strong> Models are trained on historical data using a custom C++/Python trainer (open source under CC BY-SA 4.0). What is on-chain is the resulting frozen ensemble — its weights and topology — not the training procedure. Once minted, a model is immutable.</li>
+            <li><strong>Market data is off-chain.</strong> Candles and funding history come from Binance Futures via the dApp's <code>fetch</code> calls. The chain has no oracle for them. This is a deliberate architecture choice — the on-chain part is the <em>verifiable computation</em>; getting fresh inputs into the EVM is a separate (and well-understood) oracle problem.</li>
+            <li><strong>No order execution.</strong> This is a prediction surface, not an automated trading system. Probabilities are emitted; humans (or downstream contracts) act on them. The dApp explicitly does not place trades.</li>
+          </ul>
+        </section>
+
+        <section class="about-section">
+          <h2>Reading the rest of this page</h2>
+          <ul class="about-tab-guide">
+            <li><strong>Web3 AI Desk</strong> — live snapshot of all six models, latest predictions for each asset pair. Click <em>Run all 6 on-chain inferences</em> to fire six parallel <code>predictView</code> calls against the chain.</li>
+            <li><strong>Backtest</strong> — historical chart of each prediction overlaid on actual price action, with strict-signal grading (full target hit, half-target only, delayed hit, missed, pending).</li>
+            <li><strong>Predictions history</strong> — table of every model output produced so far, inner-joined across the long/short pair for each asset.</li>
+            <li><strong>Blockchain inference</strong> — pick any past 15-minute candle, run both models against it strictly causally, see what they would have said in real time. Outcome scoring against the actual ±target move follows automatically when ≥5h of forward data exists.</li>
+            <li><strong>On-chain AI models</strong> — per-model spec sheet: token id, model hash, test metrics, hyperparameters, barrier configuration.</li>
+          </ul>
+        </section>
+
+        <section class="about-section">
+          <h2>Links</h2>
+          <div class="about-links">
+            <a href="https://gl1f.com/GL1F.pdf" target="_blank" rel="noopener" class="about-link">
+              <span class="about-link-title">GL1F whitepaper</span>
+              <span class="about-link-host">gl1f.com/GL1F.pdf</span>
+            </a>
+            <a href="https://gl1f.com/gl1f_crypto_pitch_deck.html" target="_blank" rel="noopener" class="about-link">
+              <span class="about-link-title">GL1F protocol pitch deck</span>
+              <span class="about-link-host">gl1f.com</span>
+            </a>
+            <a href="https://github.com/GenesisL1/Forest" target="_blank" rel="noopener" class="about-link">
+              <span class="about-link-title">Forest source code</span>
+              <span class="about-link-host">github.com/GenesisL1/Forest</span>
+            </a>
+            <a href="https://t.me/Genesis_L1" target="_blank" rel="noopener" class="about-link">
+              <span class="about-link-title">Telegram community</span>
+              <span class="about-link-host">t.me/Genesis_L1</span>
+            </a>
+            <a href="https://genesisl1.com" target="_blank" rel="noopener" class="about-link">
+              <span class="about-link-title">GenesisL1 chain</span>
+              <span class="about-link-host">genesisl1.com</span>
+            </a>
+            <a href="https://l1coin.com" target="_blank" rel="noopener" class="about-link">
+              <span class="about-link-title">L1coin ecosystem</span>
+              <span class="about-link-host">l1coin.com</span>
+            </a>
+          </div>
+        </section>
+
+      </div>
+    </article>
+  </section>
+
+</main>
+
+<footer class="footer">
+  <div class="legend">
+    <span class="legend-item">License · CC BY-SA 4.0</span>
+    <span class="legend-item">Registry · 0x33c9844F77a07e36B98f0FFf8201B8A8b02c2a69</span>
+    <span class="legend-item">Runtime · 0xD2fD0cf461a6cb56Fc08d9aEc120833D8E79044E</span>
+    <span class="legend-item">Chain ID · 29</span>
+  </div>
+  <p class="disclaimer">
+    Experimental research deployment. Probabilities are out-of-sample model outputs evaluated deterministically on-chain via <code>predictView</code>; they are NOT investment advice. Out-of-sample test accuracy on a fixed window does not guarantee future performance. Markets evolve; regimes shift. Treat any signal as a hypothesis, not a directive.
+  </p>
+</footer>
+
+<div class="toast" id="toast"></div>
+
+<!-- main app script will be appended here -->
+<script>
+/* ============================================================================
+ *  HELPER BUNDLE — feature math + network retries
+ * ============================================================================ */
+function rollStdAt(arr, i, n) {
+  if (i + 1 < n) return NaN;
+  let sum = 0;
+  for (let k = i - n + 1; k <= i; k++) sum += arr[k];
+  const mean = sum / n;
+  let ss = 0;
+  for (let k = i - n + 1; k <= i; k++) { const d = arr[k] - mean; ss += d * d; }
+  return Math.sqrt(ss / (n - 1));
+}
+
+function rollMeanAt(arr, i, n) { if (i + 1 < n) return NaN; let s = 0; for (let k = i - n + 1; k <= i; k++) s += arr[k]; return s / n; }
+
+function rollSumAt(arr, i, n)  { if (i + 1 < n) return NaN; let s = 0; for (let k = i - n + 1; k <= i; k++) s += arr[k]; return s; }
+
+function rollMinAt(arr, i, n)  { if (i + 1 < n) return NaN; let m = Infinity; for (let k = i - n + 1; k <= i; k++) if (arr[k] < m) m = arr[k]; return m; }
+
+function rollMaxAt(arr, i, n)  { if (i + 1 < n) return NaN; let m = -Infinity; for (let k = i - n + 1; k <= i; k++) if (arr[k] > m) m = arr[k]; return m; }
+
+function trueRangeArr(k) {
+  const n = k.length;
+  const tr = new Array(n).fill(NaN);
+  for (let j = 1; j < n; j++) {
+    const pc = k[j-1].c;
+    tr[j] = Math.max(Math.abs(k[j].h - k[j].l), Math.abs(k[j].h - pc), Math.abs(k[j].l - pc));
+  }
+  return tr;
+}
+
+function atrSmaAt(tr, i, n) { return rollMeanAt(tr, i, n); }
+
+function rsiSmaAt(closes, i, n) {
+  if (i + 1 < n + 1) return NaN;
+  let avgG = 0, avgL = 0;
+  for (let k = i - n + 1; k <= i; k++) {
+    const d = closes[k] - closes[k-1];
+    if (d > 0) avgG += d; else avgL += -d;
+  }
+  avgG /= n; avgL /= n;
+  if (avgL === 0) return 100;
+  const rs = avgG / avgL;
+  return 100 - 100 / (1 + rs);
+}
+
+function chopAt(k, tr, i, w) {
+  const sumTR = rollSumAt(tr, i, w);
+  const hh = rollMaxAt(k.map(x => x.h), i, w);
+  const ll = rollMinAt(k.map(x => x.l), i, w);
+  const denom = hh - ll;
+  if (!(denom > 0) || !(sumTR > 0)) return NaN;
+  return 100 * Math.log10(sumTR / denom) / Math.log10(w);
+}
+
+function trendConsistAt(closes, i, w, seg = 10) {
+  const nSegs = Math.floor(w / seg);
+  if (nSegs < 2 || i + 1 < w) return NaN;
+  const start = i - w + 1;
+  const segMeans = new Array(nSegs);
+  for (let s = 0; s < nSegs; s++) {
+    let sum = 0;
+    for (let j = 0; j < seg; j++) sum += closes[start + s * seg + j];
+    segMeans[s] = sum / seg;
+  }
+  const diffs = new Array(nSegs - 1);
+  for (let s = 0; s < nSegs - 1; s++) diffs[s] = segMeans[s+1] - segMeans[s];
+  const mean = diffs.reduce((a,b) => a+b, 0) / diffs.length;
+  let ss = 0; for (const d of diffs) ss += (d - mean) * (d - mean);
+  return diffs.length > 1 ? Math.sqrt(ss / (diffs.length - 1)) : 0;
+}
+
+function bollBwAt(closes, i, n) {
+  const m = rollMeanAt(closes, i, n);
+  const s = rollStdAt(closes, i, n);
+  if (!(m > 0)) return NaN;
+  return 4 * s / m * 100;
+}
+
+function emaSeries(closes, span) {
+  const alpha = 2 / (span + 1);
+  const out = new Array(closes.length);
+  out[0] = closes[0];
+  for (let i = 1; i < closes.length; i++) {
+    out[i] = alpha * closes[i] + (1 - alpha) * out[i - 1];
+  }
+  return out;
+}
+
+function skewnessAt(arr, i, n) {
+  if (i + 1 < n || n < 3) return NaN;
+  let mean = 0;
+  for (let k = i - n + 1; k <= i; k++) mean += arr[k];
+  mean /= n;
+  let m2 = 0, m3 = 0;
+  for (let k = i - n + 1; k <= i; k++) {
+    const d = arr[k] - mean;
+    m2 += d * d; m3 += d * d * d;
+  }
+  m2 /= n; m3 /= n;
+  if (m2 <= 0) return 0;
+  const g1 = m3 / Math.pow(m2, 1.5);
+  return Math.sqrt(n * (n - 1)) / (n - 2) * g1;
+}
+
+function signPersistMeanAt(arr, i, n) {
+  if (i + 1 < n) return NaN;
+  let s = 0;
+  for (let k = i - n + 1; k <= i; k++) s += Math.sign(arr[k]);
+  return s / n;
+}
+
+function rangeEffMeanAt(klines, i, n) {
+  if (i + 1 < n) return NaN;
+  let s = 0;
+  for (let k = i - n + 1; k <= i; k++) {
+    const rng = klines[k].h - klines[k].l;
+    s += rng > 0 ? Math.abs(klines[k].c - klines[k].o) / rng : 0;
+  }
+  return s / n;
+}
+
+function trendR2At(closes, i, n) {
+  if (i + 1 < n) return NaN;
+  const start = i - n + 1;
+  const mx = (n - 1) / 2;
+  let my = 0;
+  for (let k = start; k <= i; k++) my += closes[k];
+  my /= n;
+  let sxx = 0, syy = 0, sxy = 0;
+  for (let k = 0; k < n; k++) {
+    const dx = k - mx;
+    const dy = closes[start + k] - my;
+    sxx += dx * dx; syy += dy * dy; sxy += dx * dy;
+  }
+  if (sxx <= 0 || syy <= 0) return 0;
+  const r = sxy * (n - 1) / (n * Math.sqrt(sxx * syy));
+  return r * r;
+}
+
+function buildAllFeatures(k, funding) {
+  const n = k.length;
+  const i = n - 1;
+  const c = k[i].c;
+  const closes = k.map(x => x.c);
+  const highs  = k.map(x => x.h);
+  const lows   = k.map(x => x.l);
+  // Log returns (used for r1_log, r12_log, ret_skew_24h, rv6_over_rv24, sign_persist_12)
+  const r1 = new Array(n).fill(0);
+  for (let j = 1; j < n; j++) r1[j] = Math.log(k[j].c / k[j-1].c);
+  // Simple percentage returns (used for volatility_5, mom_5 — match pandas pct_change)
+  const r1pct = new Array(n).fill(0);
+  for (let j = 1; j < n; j++) r1pct[j] = k[j].c / k[j-1].c - 1;
+  const tr = trueRangeArr(k);
+  const atr14 = atrSmaAt(tr, i, 14);
+  const feats = {};
+
+  /* ── Common to both models ──────────────────────────────────────── */
+  feats.r1_log  = Math.log(k[i].c / k[i-1].c);
+  feats.r12_log = Math.log(k[i].c / k[i-12].c);
+  feats.RSI14 = rsiSmaAt(closes, i, 14);
+  feats.ATR_norm14 = atr14 / c;
+  const rng = k[i].h - k[i].l;
+  feats.body_range_ratio = rng > 0 ? Math.abs(k[i].c - k[i].o) / rng : 0;
+
+  const atr100 = atrSmaAt(tr, i, 100);
+  const hh100  = rollMaxAt(highs, i, 100);
+  const ll100  = rollMinAt(lows,  i, 100);
+  const hlR100 = hh100 - ll100;
+  const bb20   = bollBwAt(closes, i, 20);
+  const bb50   = bollBwAt(closes, i, 50);
+  const ch100  = chopAt(k, tr, i, 100);
+  const tc100  = trendConsistAt(closes, i, 100, 10);
+
+  feats.BollBW50        = bb50;
+  feats.ATR_ratio100    = atr100 / c;
+  feats.BW_CHOP100      = (ch100 !== 0 && isFinite(ch100)) ? bb20 / ch100 : 0;
+  feats.ATR_HL_ratio100 = hlR100 > 0 ? atr100 / hlR100 : 0;
+  feats.TrendConsist100 = tc100;
+
+  const d = new Date(k[i].t);
+  feats.hour = d.getUTCHours();
+  feats.dow  = (d.getUTCDay() + 6) % 7;
+
+  let fr = 0, frMa24 = 0, frCum24 = 0;
+  if (funding && funding.length) {
+    const sorted = [...funding].sort((a,b) => a.t - b.t);
+    let cur = 0;
+    for (const f of sorted) { if (f.t <= k[i].t) cur = f.r; else break; }
+    fr = cur;
+    let sum = 0, cnt = 0;
+    for (let off = 95; off >= 0; off--) {
+      const t = k[i - off].t;
+      let v = 0;
+      for (const f of sorted) { if (f.t <= t) v = f.r; else break; }
+      sum += v; cnt++;
+    }
+    frMa24 = cnt > 0 ? sum / cnt : 0;
+    frCum24 = sum;
+  }
+  feats.funding_rate         = fr;
+  feats.funding_rate_ma_24h  = frMa24;
+  feats.funding_cum_24h      = frCum24;
+
+  const ema5Series = emaSeries(closes, 5);
+  const ema5 = ema5Series[i];
+
+  feats.close_to_ema5 = c / ema5 - 1.0;
+  feats.dist_ema5_atr = atr14 > 0 ? (c - ema5) / atr14 : 0;
+
+  const rv6  = rollStdAt(r1, i, 24);
+  const rv24 = rollStdAt(r1, i, 96);
+  feats.rv6_over_rv24 = rv24 > 0 ? rv6 / rv24 : 0;
+
+  feats.ret_skew_24h       = skewnessAt(r1, i, 96);
+  feats.range_efficiency_6 = rangeEffMeanAt(k, i, 6);
+  feats.trend_r2_12        = trendR2At(closes, i, 12);
+
+  feats.open_time = d.getUTCFullYear();
+
+  /* ── Shared by both XRP models (full 33-feature schema) ─────────── */
+  // body_signed_3 = mean over last 3 bars of (close-open)/(high-low)
+  let bsSum = 0;
+  for (let j = i - 2; j <= i; j++) {
+    const r = k[j].h - k[j].l;
+    bsSum += r > 0 ? (k[j].c - k[j].o) / r : 0;
+  }
+  feats.body_signed_3 = bsSum / 3;
+
+  // taker_imb_sum_6 = sum over last 24 bars (H(6) at 15m) of (2*tbb-v)/v
+  let imbSum = 0;
+  for (let j = i - 23; j <= i; j++) {
+    if (k[j].v > 0) imbSum += (2 * k[j].tbb - k[j].v) / k[j].v;
+  }
+  feats.taker_imb_sum_6 = imbSum;
+
+  feats.sign_persist_12 = signPersistMeanAt(r1, i, 12);
+
+  // wick_imbalance_3 = mean over last 3 bars of (lower_wick - upper_wick)/(h-l)
+  let wiSum = 0;
+  for (let j = i - 2; j <= i; j++) {
+    const r = k[j].h - k[j].l;
+    if (r > 0) {
+      const upper_w = (k[j].h - Math.max(k[j].c, k[j].o)) / r;
+      const lower_w = (Math.min(k[j].c, k[j].o) - k[j].l) / r;
+      wiSum += lower_w - upper_w;
+    }
+  }
+  feats.wick_imbalance_3 = wiSum / 3;
+
+  // volume_surge_3 = current bar volume / mean over last 24 bars (H(6) at 15m)
+  // Captures liquidation-cascade / institutional-entry events.
+  let vMean24 = 0;
+  for (let j = i - 23; j <= i; j++) vMean24 += k[j].v;
+  vMean24 /= 24;
+  feats.volume_surge_3 = vMean24 > 0 ? k[i].v / vMean24 : 0;
+
+  // Multi-bar returns + short-window vol / momentum
+  feats.return_5_3   = (k[i].c / k[i-3].c) - 1;
+  feats.return_60_3  = (k[i].c / k[i-36].c) - 1;
+  feats.volatility_5 = rollStdAt(r1pct, i, 12);
+  feats.mom_5        = rollSumAt(r1pct, i, 5);
+
+  // Distance to 24h extremes in ATR units (H(24) at 15m = 96 bars)
+  const hh24 = rollMaxAt(highs, i, 96);
+  const ll24 = rollMinAt(lows,  i, 96);
+  feats.dist_high24_atr = atr14 > 0 ? (c - hh24) / atr14 : 0;
+  feats.dist_low24_atr  = atr14 > 0 ? (c - ll24) / atr14 : 0;
+
+  /* ── Sanity check: every feature in the union is finite ─────────── */
+  for (const name of ALL_FEATURES) {
+    if (!(name in feats) || !isFinite(feats[name])) {
+      throw new Error('feature not finite: ' + name + ' = ' + feats[name]);
+    }
+  }
+  return { feats, ema5 };
+}
+
+async function fetchWithTimeout(url, ms) {
+  const ctrl  = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  try {
+    const r = await fetch(url, { signal: ctrl.signal });
+    if (!r.ok) throw new Error('http ' + r.status);
+    return await r.json();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function withRetry(fn, opts = {}) {
+  const cfg = { ...NET_DEFAULTS, ...opts };
+  let lastErr = null;
+  for (let attempt = 1; attempt <= cfg.maxAttempts; attempt++) {
+    if (cfg.onAttempt) cfg.onAttempt(attempt);
+    try {
+      return await fn(attempt);
+    } catch (err) {
+      lastErr = err;
+      if (attempt < cfg.maxAttempts) {
+        const delay = cfg.initialDelayMs * Math.pow(cfg.backoffFactor, attempt - 1);
+        if (cfg.onRetry) cfg.onRetry(attempt, err, delay);
+        await new Promise(r => setTimeout(r, delay));
+      } else {
+        if (cfg.onFinalFail) cfg.onFinalFail(err);
+      }
+    }
+  }
+  throw lastErr;
+}
+
+function packFeaturesFor(modelKey, featuresMap, scaleQ) {
+  const order = MODELS[modelKey].featureOrder;
+  const buf = new Uint8Array(order.length * 4);
+  const dv  = new DataView(buf.buffer);
+  for (let i = 0; i < order.length; i++) {
+    let q = Math.round(featuresMap[order[i]] * scaleQ);
+    if (q < -2147483648) q = -2147483648;
+    if (q >  2147483647) q =  2147483647;
+    dv.setInt32(i * 4, q, true);
+  }
+  return buf;
+}
+
+
+/* ============================================================================
+ *  TRADING DESK APPLICATION
+ * ============================================================================ */
+/* ============================================================================
+ *  FOREST TRADING DESK · Main application script
+ *  ============================================================================
+ *  Initial render: each tab is empty. Switching to a tab lazy-instantiates its
+ *  content. Asset state for Overview is loaded once on first paint from local
+ *  CSVs (xrp[up|dn]_predictions.csv etc.) — same folder as this HTML.
+ *  Explicit live inference is gated behind the Execute button; touches the
+ *  on-chain ForestRuntime via predictView.
+ * ============================================================================ */
+'use strict';
+
+const REGISTRY = {
+  "eth": {
+    "symbol": "ETHUSDT",
+    "name": "Ethereum",
+    "short": "ETH",
+    "priceDp": 2,
+    "priceDpAxis": 0,
+    "launchDate": "2019-11-27",
+    "movePct": 2.0,
+    "retracePct": 0.7,
+    "up": {
+      "tokenId": 6,
+      "modelId": "0xc3f477961c610d0f2f8312306c64f91240e7e2058b3f3d931bdf31be7d151e9d",
+      "targetMult": 1.02,
+      "stopMult": 0.993,
+      "featureOrder": [
+        "open_time",
+        "r1_log",
+        "r12_log",
+        "RSI14",
+        "ATR_norm14",
+        "body_range_ratio",
+        "ATR_ratio100",
+        "BollBW50",
+        "BW_CHOP100",
+        "ATR_HL_ratio100",
+        "TrendConsist100",
+        "return_60_3",
+        "hour",
+        "dow",
+        "funding_rate",
+        "funding_rate_ma_24h",
+        "funding_cum_24h",
+        "dist_ema5_atr",
+        "rv6_over_rv24",
+        "body_signed_3",
+        "taker_imb_sum_6",
+        "ret_skew_24h",
+        "sign_persist_12",
+        "range_efficiency_6",
+        "trend_r2_12",
+        "dist_low24_atr"
+      ],
+      "csv": "ethup2_predictions.csv",
+      "trees": 1496,
+      "depth": 8,
+      "testAcc": 95.66,
+      "testLogloss": 0.1094
+    },
+    "dn": {
+      "tokenId": 7,
+      "modelId": "0xf4149f429c5f9448ac40e3df0a9e92fdc427a5c684716b4c4f033e827d00d56c",
+      "targetMult": 0.98,
+      "stopMult": 1.007,
+      "featureOrder": [
+        "open_time",
+        "r1_log",
+        "r12_log",
+        "RSI14",
+        "ATR_norm14",
+        "body_range_ratio",
+        "ATR_ratio100",
+        "BollBW50",
+        "BW_CHOP100",
+        "ATR_HL_ratio100",
+        "TrendConsist100",
+        "return_5_3",
+        "return_60_3",
+        "volatility_5",
+        "mom_5",
+        "hour",
+        "dow",
+        "funding_rate",
+        "funding_rate_ma_24h",
+        "funding_cum_24h",
+        "close_to_ema5",
+        "dist_ema5_atr",
+        "rv6_over_rv24",
+        "wick_imbalance_3",
+        "ret_skew_24h",
+        "range_efficiency_6",
+        "trend_r2_12"
+      ],
+      "csv": "ethdn2_predictions.csv",
+      "trees": 2500,
+      "depth": 8,
+      "testAcc": 95.62,
+      "testLogloss": 0.1122
+    }
+  },
+  "xrp": {
+    "symbol": "XRPUSDT",
+    "name": "XRP",
+    "short": "XRP",
+    "priceDp": 4,
+    "priceDpAxis": 2,
+    "launchDate": "2020-01-06",
+    "movePct": 2.0,
+    "retracePct": 0.7,
+    "up": {
+      "tokenId": 8,
+      "modelId": "0x658a6f723a7b6726a339551f9c2a1f1db0dcf2551f8ef015138f71383f0d5820",
+      "targetMult": 1.02,
+      "stopMult": 0.993,
+      "featureOrder": [
+        "open_time",
+        "r1_log",
+        "r12_log",
+        "RSI14",
+        "ATR_norm14",
+        "body_range_ratio",
+        "ATR_ratio100",
+        "BollBW50",
+        "BW_CHOP100",
+        "ATR_HL_ratio100",
+        "TrendConsist100",
+        "return_5_3",
+        "return_60_3",
+        "volatility_5",
+        "mom_5",
+        "hour",
+        "dow",
+        "funding_rate",
+        "funding_rate_ma_24h",
+        "funding_cum_24h",
+        "close_to_ema5",
+        "dist_ema5_atr",
+        "rv6_over_rv24",
+        "body_signed_3",
+        "wick_imbalance_3",
+        "volume_surge_3",
+        "taker_imb_sum_6",
+        "ret_skew_24h",
+        "sign_persist_12",
+        "range_efficiency_6",
+        "trend_r2_12",
+        "dist_high24_atr",
+        "dist_low24_atr"
+      ],
+      "csv": "xrpup_predictions.csv",
+      "trees": 1008,
+      "depth": 8,
+      "testAcc": 94.63,
+      "testLogloss": 0.1403
+    },
+    "dn": {
+      "tokenId": 9,
+      "modelId": "0xb80e00c37734a6d4feeef0b31d64cfdc1bb9db88d97e3ca1a8dfcac86554e674",
+      "targetMult": 0.98,
+      "stopMult": 1.007,
+      "featureOrder": [
+        "open_time",
+        "r1_log",
+        "r12_log",
+        "RSI14",
+        "ATR_norm14",
+        "body_range_ratio",
+        "ATR_ratio100",
+        "BollBW50",
+        "BW_CHOP100",
+        "ATR_HL_ratio100",
+        "TrendConsist100",
+        "return_5_3",
+        "return_60_3",
+        "volatility_5",
+        "mom_5",
+        "hour",
+        "dow",
+        "funding_rate",
+        "funding_rate_ma_24h",
+        "funding_cum_24h",
+        "close_to_ema5",
+        "dist_ema5_atr",
+        "rv6_over_rv24",
+        "body_signed_3",
+        "wick_imbalance_3",
+        "volume_surge_3",
+        "taker_imb_sum_6",
+        "ret_skew_24h",
+        "sign_persist_12",
+        "range_efficiency_6",
+        "trend_r2_12",
+        "dist_high24_atr",
+        "dist_low24_atr"
+      ],
+      "csv": "xrpdn_predictions.csv",
+      "trees": 1552,
+      "depth": 9,
+      "testAcc": 94.51,
+      "testLogloss": 0.1387
+    }
+  },
+  "zec": {
+    "symbol": "ZECUSDT",
+    "name": "Zcash",
+    "short": "ZEC",
+    "priceDp": 2,
+    "priceDpAxis": 1,
+    "launchDate": "2020-01-01",
+    "movePct": 4.0,
+    "retracePct": 1.0,
+    "up": {
+      "tokenId": 10,
+      "modelId": "0xaaf9258b934df11eda27dc4c78437dc99954dfdd76b0d5a6f550e5d1bcadc166",
+      "targetMult": 1.04,
+      "stopMult": 0.99,
+      "featureOrder": [
+        "open_time",
+        "r1_log",
+        "r12_log",
+        "RSI14",
+        "ATR_norm14",
+        "body_range_ratio",
+        "ATR_ratio100",
+        "BollBW50",
+        "BW_CHOP100",
+        "ATR_HL_ratio100",
+        "TrendConsist100",
+        "return_5_3",
+        "return_60_3",
+        "volatility_5",
+        "mom_5",
+        "hour",
+        "dow",
+        "funding_rate",
+        "funding_rate_ma_24h",
+        "funding_cum_24h",
+        "close_to_ema5",
+        "dist_ema5_atr",
+        "rv6_over_rv24",
+        "body_signed_3",
+        "wick_imbalance_3",
+        "volume_surge_3",
+        "taker_imb_sum_6",
+        "ret_skew_24h",
+        "sign_persist_12",
+        "range_efficiency_6",
+        "trend_r2_12",
+        "dist_high24_atr",
+        "dist_low24_atr"
+      ],
+      "csv": "zecup_predictions.csv",
+      "trees": 1789,
+      "depth": 7,
+      "testAcc": 93.54,
+      "testLogloss": 0.1592
+    },
+    "dn": {
+      "tokenId": 11,
+      "modelId": "0x7f7f2ecc5f9ccc048430490d9ffbbf28211e16a74d0f50e036ad14ca21dec48a",
+      "targetMult": 0.96,
+      "stopMult": 1.01,
+      "featureOrder": [
+        "open_time",
+        "r1_log",
+        "r12_log",
+        "RSI14",
+        "ATR_norm14",
+        "body_range_ratio",
+        "ATR_ratio100",
+        "BollBW50",
+        "BW_CHOP100",
+        "ATR_HL_ratio100",
+        "TrendConsist100",
+        "return_5_3",
+        "return_60_3",
+        "volatility_5",
+        "mom_5",
+        "hour",
+        "dow",
+        "funding_rate",
+        "funding_rate_ma_24h",
+        "funding_cum_24h",
+        "close_to_ema5",
+        "dist_ema5_atr",
+        "rv6_over_rv24",
+        "body_signed_3",
+        "wick_imbalance_3",
+        "volume_surge_3",
+        "taker_imb_sum_6",
+        "ret_skew_24h",
+        "sign_persist_12",
+        "range_efficiency_6",
+        "trend_r2_12",
+        "dist_high24_atr",
+        "dist_low24_atr"
+      ],
+      "csv": "zecdn_predictions.csv",
+      "trees": 1042,
+      "depth": 8,
+      "testAcc": 94.58,
+      "testLogloss": 0.1417
+    }
+  }
+};
+
+const RPC_URL  = 'https://rpc.genesisl1.org';
+const CHAIN_ID = 29;
+const REGISTRY_ADDR = '0x33c9844F77a07e36B98f0FFf8201B8A8b02c2a69';
+const RUNTIME_ADDR  = '0xD2fD0cf461a6cb56Fc08d9aEc120833D8E79044E';
+const BINANCE_FAPI  = 'https://fapi.binance.com';
+
+const NET_DEFAULTS = {
+  maxAttempts:    8,
+  initialDelayMs: 250,
+  backoffFactor:  1.6,
+  perAttemptMs:   15000
+};
+
+const ABI_REGISTRY = [
+  'function getModelSummary(uint256 tokenId) view returns (bool exists, bytes32 modelId, address tablePtr, uint16 nFeatures, uint16 nTrees, uint16 depth, int32 baseQ, uint8 pricingMode, uint256 feeWei, address feeRecipient, bool inferenceEnabled, address creator, uint32 tosVersionAccepted, string title, string description)',
+  'function getModelRuntime(bytes32 modelId) view returns (address tablePtr, uint32 chunkSize, uint32 numChunks, uint32 totalBytes, uint16 nFeatures, uint16 nTrees, uint16 depth, int32 baseQ, uint32 scaleQ, bool inferenceEnabled, uint8 pricingMode, uint256 feeWei, address feeRecipient)'
+];
+const ABI_RUNTIME = [
+  'function predictView(bytes32 modelId, bytes packedFeaturesQ) view returns (int256)'
+];
+
+const ASSET_KEYS  = ['eth', 'xrp', 'zec'];
+const FIFTEEN_MIN_MS = 15 * 60 * 1000;
+const ALL_FEATURES = (() => {
+  const set = new Set();
+  for (const k of ASSET_KEYS) {
+    for (const f of REGISTRY[k].up.featureOrder) set.add(f);
+    for (const f of REGISTRY[k].dn.featureOrder) set.add(f);
+  }
+  return [...set];
+})();
+
+/* ── ASSET-AWARE FORMATTING ───────────────────────────────────────────── */
+function fmtPriceFor(key, v) {
+  if (!Number.isFinite(v)) return '—';
+  const dp = REGISTRY[key].priceDp;
+  return '$' + v.toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp });
+}
+function fmtPct(v, dp = 2) {
+  if (!Number.isFinite(v)) return '—';
+  return v.toFixed(dp) + '%';
+}
+function fmtMs(ms) {
+  if (!Number.isFinite(ms)) return '—';
+  if (ms < 1)    return ms.toFixed(2) + ' ms';
+  if (ms < 1000) return ms.toFixed(1) + ' ms';
+  return (ms / 1000).toFixed(2) + ' s';
+}
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  })[c]);
+}
+function classify(pPct) {
+  if (pPct >= 80) return 'high';
+  if (pPct >= 60) return 'elevated';
+  if (pPct >= 40) return 'indeter';
+  if (pPct >= 20) return 'weak';
+  return 'below';
+}
+
+/* ── TOAST ────────────────────────────────────────────────────────────── */
+let toastTimer = null;
+function toast(msg, kind = '') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast visible' + (kind ? ' ' + kind : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('visible'), 3000);
+}
+
+/* ── THEME TOGGLE ─────────────────────────────────────────────────────── */
+(function initTheme() {
+  const KEY = 'gl1f-desk-theme';
+  try {
+    const stored = localStorage.getItem(KEY);
+    if (stored === 'light') document.documentElement.setAttribute('data-theme', 'light');
+  } catch(_) {}
+  const btn = document.getElementById('themeToggle');
+  if (!btn) return;
+  btn.addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+    const next = cur === 'light' ? 'dark' : 'light';
+    if (next === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+    try { localStorage.setItem(KEY, next); } catch(_){}
+    const meta = document.getElementById('metaThemeColor');
+    if (meta) meta.setAttribute('content', next === 'light' ? '#f8f8f7' : '#0a0a0a');
+  });
+})();
+
+/* ============================================================================
+ *  TAB / SUBTAB ROUTER
+ * ============================================================================ */
+document.querySelectorAll('.tab').forEach(t => {
+  t.addEventListener('click', () => {
+    const id = t.dataset.tab;
+    document.querySelectorAll('.tab').forEach(x => x.classList.toggle('active', x === t));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + id));
+    onTabActivate(id);
+  });
+});
+document.querySelectorAll('.subtab-bar').forEach(bar => {
+  bar.querySelectorAll('.subtab').forEach(b => {
+    b.addEventListener('click', () => {
+      const group = bar.dataset.subtabGroup;
+      const target = b.dataset.asset || b.dataset.model;
+      bar.querySelectorAll('.subtab').forEach(x => x.classList.toggle('active', x === b));
+      const container = document.getElementById(group + 'Panes');
+      if (group === 'models') {
+        renderModelsPane(target);
+      } else {
+        container.querySelectorAll('.subtab-panel').forEach(p => {
+          p.classList.toggle('active', (p.dataset.asset || '') === target);
+        });
+        onSubtabActivate(group, target);
+      }
+    });
+  });
+});
+
+const tabState = { overview: false, backtest: false, history: false, inference: false, models: false, about: false };
+const subtabState = {};
+
+function onTabActivate(tabId) {
+  if (tabId === 'overview' && !tabState.overview) { initOverview(); tabState.overview = true; }
+  if (tabId === 'backtest') {
+    if (!tabState.backtest) tabState.backtest = true;
+    const active = document.querySelector('.subtab-bar[data-subtab-group="backtest"] .subtab.active');
+    if (active) onSubtabActivate('backtest', active.dataset.asset);
+  }
+  if (tabId === 'history') {
+    if (!tabState.history) tabState.history = true;
+    const active = document.querySelector('.subtab-bar[data-subtab-group="history"] .subtab.active');
+    if (active) onSubtabActivate('history', active.dataset.asset);
+  }
+  if (tabId === 'inference') {
+    if (!tabState.inference) tabState.inference = true;
+    const active = document.querySelector('.subtab-bar[data-subtab-group="inference"] .subtab.active');
+    if (active) onSubtabActivate('inference', active.dataset.asset);
+  }
+  if (tabId === 'models' && !tabState.models) {
+    renderModelsPane('all');
+    tabState.models = true;
+  }
+}
+
+function onSubtabActivate(group, key) {
+  if (!key) return;
+  const stateKey = group + ':' + key;
+  if (subtabState[stateKey]) return;
+  subtabState[stateKey] = true;
+  if (group === 'backtest')  initBacktestPane(key);
+  if (group === 'history')   initHistoryPane(key);
+  if (group === 'inference') initInspectorPane(key);
+}
+
+/* ============================================================================
+ *  CSV LOADING — same-folder filesystem (works with `file://` or any http)
+ * ============================================================================ */
+async function fetchCsv(path) {
+  const r = await fetch(path, { cache: 'no-cache' });
+  if (!r.ok) throw new Error(`HTTP ${r.status} loading ${path}`);
+  return r.text();
+}
+function parseCsv(text) {
+  // Minimal RFC-4180 CSV parser: assumes daemon-written shape, no embedded quotes/newlines
+  const lines = text.trim().split(/\r?\n/);
+  if (lines.length === 0) return { headers: [], rows: [] };
+  const headers = lines[0].split(',');
+  const rows = lines.slice(1).map(line => {
+    const cells = line.split(',');
+    const o = {};
+    headers.forEach((h, i) => o[h] = cells[i] ?? '');
+    return o;
+  });
+  return { headers, rows };
+}
+
+/* ============================================================================
+ *  OVERVIEW TAB — 3 asset rows, latest snapshot from CSVs
+ * ============================================================================ */
+async function initOverview() {
+  const wrap = document.getElementById('overviewRows');
+  wrap.innerHTML = '';
+  for (const key of ASSET_KEYS) {
+    const card = document.createElement('section');
+    card.className = 'card';
+    card.id = 'overview-row-' + key;
+    card.innerHTML = renderOverviewRowShell(key);
+    wrap.appendChild(card);
+  }
+  // Wire each per-row Execute button (one inference call per asset = 2 models)
+  wrap.querySelectorAll('.exec-btn[data-exec-asset]').forEach(btn => {
+    btn.addEventListener('click', () => executeAssetLive(btn.dataset.execAsset));
+  });
+  await refreshOverviewFromCsv();
+}
+
+function renderOverviewRowShell(key) {
+  const a = REGISTRY[key];
+  return `
+    <div class="asset-row" data-asset="${key}">
+      <div class="asset-pane">
+        <div class="asset-id">
+          <span class="asset-id-dot" style="background:${assetColor(key)};"></span>
+          <span class="asset-name">${a.name}</span>
+          <span class="asset-sym">${a.symbol}</span>
+        </div>
+        <div class="asset-price" data-field="price">—</div>
+        <dl class="asset-meta">
+          <div><dt>EMA₅</dt><dd data-field="ema">—</dd></div>
+          <div><dt>Bar</dt><dd data-field="bar">—</dd></div>
+        </dl>
+      </div>
+      <div class="side-pane up">
+        <div class="side-label">↑ Model #${a.up.tokenId} · P(+${a.movePct}%)</div>
+        <div class="prob-val" data-field="pup">—</div>
+        <div class="prob-sub" data-field="pup-sub">awaiting</div>
+        <span class="classification below up" data-field="pup-class">awaiting</span>
+      </div>
+      <div class="side-pane dn">
+        <div class="side-label">↓ Model #${a.dn.tokenId} · P(−${a.movePct}%)</div>
+        <div class="prob-val" data-field="pdn">—</div>
+        <div class="prob-sub" data-field="pdn-sub">awaiting</div>
+        <span class="classification below dn" data-field="pdn-class">awaiting</span>
+      </div>
+      <div class="bias-pane">
+        <span class="bias-pill neutral" data-field="bias">neutral</span>
+        <dl class="bias-targets">
+          <div><dt>Targets</dt><dd data-field="targets">—</dd></div>
+          <div><dt>Updated</dt><dd data-field="updated">—</dd></div>
+        </dl>
+      </div>
+      <div class="exec-pane">
+        <button class="exec-btn" data-exec-asset="${key}" type="button">
+          <span class="exec-ico">▸</span>
+          <span class="exec-label">On-chain inference call</span>
+        </button>
+        <div class="exec-status" data-field="exec-status">cached</div>
+      </div>
+    </div>`;
+}
+
+function assetColor(key) {
+  return { eth: '#627eea', xrp: '#00aae4', zec: '#f4b728' }[key] || '#666';
+}
+
+async function refreshOverviewFromCsv() {
+  const statusEl = document.getElementById('overviewStatus');
+  statusEl.innerHTML = '<span class="muted">Loading latest snapshots…</span>';
+  let okCount = 0, errCount = 0;
+  for (const key of ASSET_KEYS) {
+    try {
+      const [upCsv, dnCsv] = await Promise.all([
+        fetchCsv(REGISTRY[key].up.csv).catch(e => { throw new Error(`${REGISTRY[key].short} long: ${e.message || e}`); }),
+        fetchCsv(REGISTRY[key].dn.csv).catch(e => { throw new Error(`${REGISTRY[key].short} short: ${e.message || e}`); }),
+      ]);
+      const upRows = parseCsv(upCsv).rows;
+      const dnRows = parseCsv(dnCsv).rows;
+      paintOverviewRow(key, upRows, dnRows);
+      okCount++;
+    } catch (err) {
+      paintOverviewRowError(key, (err && err.message) || String(err) || 'load failed');
+      errCount++;
+    }
+  }
+  statusEl.innerHTML = okCount === 3
+    ? `<span class="ok">✓ All 3 asset snapshots loaded</span>`
+    : errCount === 3
+      ? `<span class="err">✗ Snapshots unavailable — daemons may still be initializing</span>`
+      : `<span>${okCount} of 3 asset snapshots loaded</span>`;
+  updateTape();
+}
+
+function paintOverviewRow(key, upRows, dnRows) {
+  const row = document.getElementById('overview-row-' + key);
+  if (!row || upRows.length === 0 || dnRows.length === 0) return paintOverviewRowError(key, 'no data yet');
+  // Latest matched candle (inner-join most recent shared open_time_ms)
+  const upByMs = new Map(upRows.map(r => [r.open_time_ms, r]));
+  let matched = null;
+  // dn list is typically ordered chronologically; scan from end
+  for (let i = dnRows.length - 1; i >= 0; i--) {
+    const dr = dnRows[i];
+    const ur = upByMs.get(dr.open_time_ms);
+    if (ur) { matched = { up: ur, dn: dr }; break; }
+  }
+  if (!matched) return paintOverviewRowError(key, 'no shared candle');
+  const ur = matched.up, dr = matched.dn;
+  const close   = parseFloat(ur.close);
+  const ema5    = parseFloat(ur.ema5);
+  const pUpPct  = parseFloat(ur.probability_pct);
+  const pDnPct  = parseFloat(dr.probability_pct);
+  const upRaw   = parseFloat(ur.raw_logit);
+  const dnRaw   = parseFloat(dr.raw_logit);
+  const open    = ur.open_time_iso || '';
+  const dt = open ? new Date(open) : null;
+
+  row.querySelector('[data-field="price"]').textContent = fmtPriceFor(key, close);
+  row.querySelector('[data-field="ema"]').textContent   = fmtPriceFor(key, ema5);
+  row.querySelector('[data-field="bar"]').textContent   = dt ? dt.toISOString().slice(0,16).replace('T',' ') + 'Z' : '—';
+
+  const pUpEl = row.querySelector('[data-field="pup"]');
+  const pDnEl = row.querySelector('[data-field="pdn"]');
+  pUpEl.textContent = fmtPct(pUpPct);
+  pDnEl.textContent = fmtPct(pDnPct);
+  row.querySelector('[data-field="pup-sub"]').textContent = `logit ${upRaw.toFixed(3)} · σ → ${(pUpPct/100).toFixed(4)}`;
+  row.querySelector('[data-field="pdn-sub"]').textContent = `logit ${dnRaw.toFixed(3)} · σ → ${(pDnPct/100).toFixed(4)}`;
+
+  const upClassEl = row.querySelector('[data-field="pup-class"]');
+  const dnClassEl = row.querySelector('[data-field="pdn-class"]');
+  upClassEl.textContent = (ur.classification || classify(pUpPct));
+  dnClassEl.textContent = (dr.classification || classify(pDnPct));
+  upClassEl.className = 'classification ' + classify(pUpPct) + ' up';
+  dnClassEl.className = 'classification ' + classify(pDnPct) + ' dn';
+
+  // Bias = directional signal: long if pUp >> pDn, short if pDn >> pUp, neutral otherwise
+  const delta = pUpPct - pDnPct;
+  const biasEl = row.querySelector('[data-field="bias"]');
+  if (Math.abs(delta) < 5) {
+    biasEl.className = 'bias-pill neutral'; biasEl.textContent = 'neutral (Δ ' + delta.toFixed(1) + ' pp)';
+  } else if (delta > 0) {
+    biasEl.className = 'bias-pill long'; biasEl.textContent = '↑ long (Δ +' + delta.toFixed(1) + ' pp)';
+  } else {
+    biasEl.className = 'bias-pill short'; biasEl.textContent = '↓ short (Δ ' + delta.toFixed(1) + ' pp)';
+  }
+
+  const tgt = ema5 * REGISTRY[key].up.targetMult;
+  const dnTgt = ema5 * REGISTRY[key].dn.targetMult;
+  row.querySelector('[data-field="targets"]').textContent =
+    fmtPriceFor(key, tgt) + ' / ' + fmtPriceFor(key, dnTgt);
+  // Updated = most recent inference timestamp
+  const inferredAt = ur.inferred_at_iso || dr.inferred_at_iso || '';
+  row.querySelector('[data-field="updated"]').textContent = inferredAt
+    ? fmtAgo(new Date(inferredAt)) : '—';
+  // Exec status: cached snapshot (will be updated to "live · just now" after Execute)
+  const exec = row.querySelector('[data-field="exec-status"]');
+  if (exec && !exec.classList.contains('live')) {
+    exec.className = 'exec-status';
+    exec.textContent = inferredAt ? 'cached · ' + fmtAgo(new Date(inferredAt)) : 'cached';
+  }
+  // Stash close + sym for tape
+  row.dataset.close = close;
+  row.dataset.spotIso = open;
+}
+
+function paintOverviewRowError(key, msg) {
+  const row = document.getElementById('overview-row-' + key);
+  if (!row) return;
+  row.querySelectorAll('[data-field]').forEach(el => {
+    if (!el.classList.contains('exec-status')) el.textContent = '—';
+  });
+  row.querySelector('[data-field="updated"]').innerHTML = '<span class="muted">' + escapeHtml(msg) + '</span>';
+  const exec = row.querySelector('[data-field="exec-status"]');
+  if (exec) { exec.className = 'exec-status'; exec.textContent = 'no cache · click button'; }
+}
+
+function fmtAgo(d) {
+  if (!d || isNaN(d.getTime())) return '—';
+  const s = (Date.now() - d.getTime()) / 1000;
+  if (s < 60)   return s.toFixed(0) + 's ago';
+  if (s < 3600) return (s/60).toFixed(0) + 'm ago';
+  if (s < 86400) return (s/3600).toFixed(1) + 'h ago';
+  return (s/86400).toFixed(1) + 'd ago';
+}
+
+/* ── TICKER TAPE ─────────────────────────────────────────────────────── */
+function updateTape() {
+  const tape = document.getElementById('tape');
+  const items = ASSET_KEYS.map(key => {
+    const row = document.getElementById('overview-row-' + key);
+    const close = parseFloat(row?.dataset.close || 'NaN');
+    const ema   = row?.querySelector('[data-field="ema"]')?.textContent || '—';
+    return `<span class="tape-item">
+      <span class="tape-sym">${REGISTRY[key].symbol}</span>
+      <span class="tape-px">${fmtPriceFor(key, close)}</span>
+    </span>`;
+  });
+  tape.innerHTML = items.join('');
+}
+
+/* ============================================================================
+ *  PER-ASSET LIVE EXECUTE — runs that asset's model pair on-chain (2 parallel
+ *  predictView calls). One button per row, identical UX to the dual dApps.
+ * ============================================================================ */
+async function executeAssetLive(key) {
+  const row = document.getElementById('overview-row-' + key);
+  if (!row) return;
+  const btn      = row.querySelector('.exec-btn[data-exec-asset="' + key + '"]');
+  const labelEl  = btn?.querySelector('.exec-label');
+  const icoEl    = btn?.querySelector('.exec-ico');
+  const statusEl = row.querySelector('[data-field="exec-status"]');
+  if (!btn || btn.disabled) return;
+
+  // Lock button, show spinner
+  btn.disabled = true; btn.classList.add('running');
+  if (icoEl)   icoEl.textContent   = '◐';
+  if (labelEl) labelEl.textContent = 'Calling on-chain…';
+  statusEl.className = 'exec-status'; statusEl.textContent = 'connecting…';
+
+  // Global status echo (subtle)
+  const status = document.getElementById('overviewStatus');
+  if (status) status.innerHTML = `<span class="muted">Running ${REGISTRY[key].short} pair on-chain (×2 predictView)…</span>`;
+
+  try {
+    if (!window.ethers) throw new Error('ethers.js still loading; retry shortly');
+    const provider = new ethers.JsonRpcProvider(RPC_URL, { name: 'genesisl1', chainId: CHAIN_ID });
+    statusEl.textContent = 'predictView…';
+    await runLiveForAsset(provider, key);
+    statusEl.className = 'exec-status live';
+    statusEl.textContent = 'live · just now';
+    if (status) status.innerHTML = `<span class="ok">✓ ${REGISTRY[key].short} on-chain inference complete</span>`;
+    updateTape();
+  } catch (err) {
+    console.error('live ' + key + ':', err);
+    const msg = (err && (err.message || String(err))) || 'unknown error';
+    statusEl.className = 'exec-status err';
+    statusEl.textContent = 'failed';
+    toast(`${REGISTRY[key].short} failed: ${msg.slice(0,48)}`, 'error');
+    if (status) status.innerHTML = `<span class="err">${REGISTRY[key].short}: ${escapeHtml(msg.slice(0,80))}</span>`;
+  } finally {
+    btn.disabled = false; btn.classList.remove('running');
+    if (icoEl)   icoEl.textContent   = '▸';
+    if (labelEl) labelEl.textContent = 'On-chain inference call';
+  }
+}
+
+async function runLiveForAsset(provider, key) {
+  const cfg = REGISTRY[key];
+  // 1. Meta — pass expected feature counts so chain mismatch fails loudly
+  const [metaUp, metaDn] = await Promise.all([
+    withRetry(() => resolveModelMeta(provider, cfg.up.tokenId, cfg.up.featureOrder.length)),
+    withRetry(() => resolveModelMeta(provider, cfg.dn.tokenId, cfg.dn.featureOrder.length)),
+  ]);
+  // 2. Market data
+  const [klinesRaw, funding] = await Promise.all([
+    withRetry(() => fetchKlines(cfg.symbol, 251)),
+    withRetry(() => fetchFunding(cfg.symbol, 50)),
+  ]);
+  const klines = klinesRaw.slice(0, -1);  // drop in-flight bar
+  if (klines.length < 105) throw new Error(`${cfg.symbol}: only ${klines.length} closed bars`);
+  // 3. Features (33-superset; we pack subsets for ETH models)
+  const { feats, ema5 } = buildAllFeatures(klines, funding);
+  const packedUp = packForOrder(cfg.up.featureOrder, feats, metaUp.scaleQ);
+  const packedDn = packForOrder(cfg.dn.featureOrder, feats, metaDn.scaleQ);
+  // 4. Two predictView in parallel
+  const [scoreQUp, scoreQDn] = await Promise.all([
+    withRetry(() => callPredict(provider, metaUp.modelId, packedUp)),
+    withRetry(() => callPredict(provider, metaDn.modelId, packedDn)),
+  ]);
+  const rawUp = Number(scoreQUp) / metaUp.scaleQ;
+  const rawDn = Number(scoreQDn) / metaDn.scaleQ;
+  const pUp = 1 / (1 + Math.exp(-rawUp));
+  const pDn = 1 / (1 + Math.exp(-rawDn));
+  const close = klines[klines.length - 1].c;
+
+  // Paint Overview row
+  const row = document.getElementById('overview-row-' + key);
+  if (row) {
+    row.querySelector('[data-field="price"]').textContent = fmtPriceFor(key, close);
+    row.querySelector('[data-field="ema"]').textContent = fmtPriceFor(key, ema5);
+    row.querySelector('[data-field="bar"]').textContent = new Date(klines[klines.length-1].t).toISOString().slice(0,16).replace('T',' ') + 'Z (live)';
+    row.querySelector('[data-field="pup"]').textContent = fmtPct(pUp * 100);
+    row.querySelector('[data-field="pdn"]').textContent = fmtPct(pDn * 100);
+    row.querySelector('[data-field="pup-sub"]').textContent = `logit ${rawUp.toFixed(3)} · σ → ${pUp.toFixed(4)}`;
+    row.querySelector('[data-field="pdn-sub"]').textContent = `logit ${rawDn.toFixed(3)} · σ → ${pDn.toFixed(4)}`;
+    const upCls = classify(pUp*100), dnCls = classify(pDn*100);
+    const upClassEl = row.querySelector('[data-field="pup-class"]');
+    const dnClassEl = row.querySelector('[data-field="pdn-class"]');
+    upClassEl.textContent = upCls; upClassEl.className = 'classification ' + upCls + ' up';
+    dnClassEl.textContent = dnCls; dnClassEl.className = 'classification ' + dnCls + ' dn';
+    const delta = (pUp - pDn) * 100;
+    const biasEl = row.querySelector('[data-field="bias"]');
+    if (Math.abs(delta) < 5) { biasEl.className = 'bias-pill neutral'; biasEl.textContent = 'neutral (Δ ' + delta.toFixed(1) + ' pp)'; }
+    else if (delta > 0) { biasEl.className = 'bias-pill long'; biasEl.textContent = '↑ long (Δ +' + delta.toFixed(1) + ' pp)'; }
+    else { biasEl.className = 'bias-pill short'; biasEl.textContent = '↓ short (Δ ' + delta.toFixed(1) + ' pp)'; }
+    row.querySelector('[data-field="targets"]').textContent =
+      fmtPriceFor(key, ema5 * cfg.up.targetMult) + ' / ' + fmtPriceFor(key, ema5 * cfg.dn.targetMult);
+    row.querySelector('[data-field="updated"]').textContent = 'just now (live)';
+    row.dataset.close = close;
+  }
+}
+
+/* ── Feature packing — takes a featureOrder list (not a model key), so it
+ *    works across all 6 model schemas. Returns a Uint8Array; callPredict
+ *    converts to hex. Identical quantization rules to the dual dApps. ──── */
+function packForOrder(order, featuresMap, scaleQ) {
+  const buf = new Uint8Array(order.length * 4);
+  const dv  = new DataView(buf.buffer);
+  for (let i = 0; i < order.length; i++) {
+    const v = featuresMap[order[i]];
+    if (!Number.isFinite(v)) throw new Error('non-finite feature: ' + order[i]);
+    let q = Math.round(v * scaleQ);
+    if (q < -2147483648) q = -2147483648;
+    if (q >  2147483647) q =  2147483647;
+    dv.setInt32(i * 4, q, true);  // little-endian
+  }
+  return buf;
+}
+
+/* ── Asset-aware fetchKlines / fetchFunding (rebound from helpers) ──── */
+async function fetchKlines(symbol, limit = 251) {
+  const url = `${BINANCE_FAPI}/fapi/v1/klines?symbol=${symbol}&interval=15m&limit=${limit}`;
+  const arr = await fetchWithTimeout(url, NET_DEFAULTS.perAttemptMs);
+  if (!Array.isArray(arr) || arr.length === 0) throw new Error('empty klines');
+  return arr.map(k => ({
+    t: k[0], o: parseFloat(k[1]), h: parseFloat(k[2]), l: parseFloat(k[3]),
+    c: parseFloat(k[4]), v: parseFloat(k[5]),
+    tr: parseInt(k[8], 10), tbb: parseFloat(k[9])
+  }));
+}
+async function fetchFunding(symbol, limit = 50) {
+  const url = `${BINANCE_FAPI}/fapi/v1/fundingRate?symbol=${symbol}&limit=${limit}`;
+  const arr = await fetchWithTimeout(url, NET_DEFAULTS.perAttemptMs);
+  if (!Array.isArray(arr)) throw new Error('bad funding');
+  return arr.map(f => ({ t: f.fundingTime, r: parseFloat(f.fundingRate) }));
+}
+async function fetchKlinesHistorical(symbol, targetMs, limit = 251) {
+  const endTime = targetMs + FIFTEEN_MIN_MS - 1;
+  const url = `${BINANCE_FAPI}/fapi/v1/klines?symbol=${symbol}&interval=15m&endTime=${endTime}&limit=${limit}`;
+  const arr = await fetchWithTimeout(url, NET_DEFAULTS.perAttemptMs);
+  if (!Array.isArray(arr) || arr.length === 0) throw new Error('empty historical klines');
+  const klines = arr.map(k => ({
+    t: k[0], o: parseFloat(k[1]), h: parseFloat(k[2]), l: parseFloat(k[3]),
+    c: parseFloat(k[4]), v: parseFloat(k[5]),
+    tr: parseInt(k[8], 10), tbb: parseFloat(k[9])
+  }));
+  const last = klines[klines.length-1];
+  if (last.t !== targetMs) throw new Error(`last bar ${new Date(last.t).toISOString().slice(0,16)}Z ≠ target ${new Date(targetMs).toISOString().slice(0,16)}Z`);
+  return klines;
+}
+async function fetchFundingHistorical(symbol, targetMs) {
+  const url = `${BINANCE_FAPI}/fapi/v1/fundingRate?symbol=${symbol}&endTime=${targetMs}&limit=50`;
+  const arr = await fetchWithTimeout(url, NET_DEFAULTS.perAttemptMs);
+  if (!Array.isArray(arr)) throw new Error('bad historical funding');
+  return arr.map(f => ({ t: f.fundingTime, r: parseFloat(f.fundingRate) }));
+}
+
+/* ── On-chain helpers (verbatim from the working XRP/ZEC dApps, adapted to
+ *    take a model spec instead of a global MODELS map). The flow is:
+ *    1. getModelSummary(tokenId)  → modelId + inferenceEnabled flag
+ *    2. getModelRuntime(modelId)  → scaleQ + nFeatures
+ *    3. predictView(modelId, packedFeatures) on the runtime contract
+ *    Caches resolved metadata per tokenId since it never changes. ───── */
+const _cachedMeta = {};
+
+async function resolveModelMeta(provider, tokenId, expectedFeatures) {
+  if (_cachedMeta[tokenId]) return _cachedMeta[tokenId];
+  const registry = new ethers.Contract(REGISTRY_ADDR, ABI_REGISTRY, provider);
+  const withTimeout = (p, label) => Promise.race([
+    p,
+    new Promise((_, rej) => setTimeout(() => rej(new Error(label + ' timeout')), NET_DEFAULTS.perAttemptMs))
+  ]);
+  const summary = await withTimeout(registry.getModelSummary(tokenId), `getModelSummary(${tokenId})`);
+  if (!summary.exists) throw new Error(`Model with tokenId ${tokenId} does not exist on chain`);
+  if (!summary.inferenceEnabled) throw new Error(`Inference is disabled for tokenId ${tokenId}`);
+  const modelId = summary.modelId;
+  const rt = await withTimeout(registry.getModelRuntime(modelId), `getModelRuntime(${tokenId})`);
+  const scaleQ    = Number(rt.scaleQ);
+  const nFeatures = Number(rt.nFeatures);
+  if (!scaleQ || !nFeatures) throw new Error(`Invalid runtime metadata for tokenId ${tokenId}`);
+  if (expectedFeatures && nFeatures !== expectedFeatures) {
+    throw new Error(`Token ${tokenId} feature-count mismatch: chain=${nFeatures}, dApp=${expectedFeatures}`);
+  }
+  const meta = { tokenId, modelId, scaleQ, nFeatures, title: summary.title };
+  _cachedMeta[tokenId] = meta;
+  return meta;
+}
+
+async function callPredict(provider, modelId, packedBytes) {
+  const runtime = new ethers.Contract(RUNTIME_ADDR, ABI_RUNTIME, provider);
+  const hex = bytesToHex(packedBytes);
+  const timeout = new Promise((_, rej) =>
+    setTimeout(() => rej(new Error('predictView timeout')), NET_DEFAULTS.perAttemptMs)
+  );
+  return await Promise.race([runtime.predictView(modelId, hex), timeout]);
+}
+
+function bytesToHex(u8) {
+  let s = '0x';
+  for (const b of u8) s += b.toString(16).padStart(2, '0');
+  return s;
+}
+
+/* ============================================================================
+ *  HISTORY TAB — per-asset table from inner-joined CSVs
+ * ============================================================================ */
+async function initHistoryPane(key) {
+  const target = document.getElementById('history-' + key);
+  target.innerHTML = `
+    <section class="card scroll-card">
+      <header class="card-head">
+        <span class="card-title">${REGISTRY[key].name} · Inference history</span>
+        <span class="card-sub" id="hist-meta-${key}">Loading…</span>
+      </header>
+      <div class="hist-meta" id="hist-summary-${key}"></div>
+      <div id="hist-body-${key}"><div class="hist-empty">Loading…</div></div>
+    </section>`;
+  await refreshHistoryFor(key);
+}
+
+async function refreshHistoryFor(key) {
+  const cfg = REGISTRY[key];
+  const summary = document.getElementById('hist-summary-' + key);
+  const body    = document.getElementById('hist-body-' + key);
+  const metaEl  = document.getElementById('hist-meta-' + key);
+  try {
+    const [upText, dnText] = await Promise.all([fetchCsv(cfg.up.csv), fetchCsv(cfg.dn.csv)]);
+    const up = parseCsv(upText).rows;
+    const dn = parseCsv(dnText).rows;
+    // Inner-join by open_time_ms
+    const upMap = new Map(up.map(r => [r.open_time_ms, r]));
+    const matched = [];
+    for (const dr of dn) {
+      const ur = upMap.get(dr.open_time_ms);
+      if (ur) matched.push({ up: ur, dn: dr });
+    }
+    matched.sort((a, b) => parseInt(b.up.open_time_ms,10) - parseInt(a.up.open_time_ms,10));
+    metaEl.textContent = `↑ ${up.length} · ↓ ${dn.length} · matched ${matched.length}`;
+    if (matched.length === 0) {
+      summary.innerHTML = ''; body.innerHTML = '<div class="hist-empty">No shared candle yet. Both daemons must produce predictions for the same open_time_ms.</div>'; return;
+    }
+    const last = matched[0];
+    const lastDt = new Date(last.up.open_time_iso || parseInt(last.up.open_time_ms, 10));
+    summary.innerHTML = `
+      <span><span class="meta-val">${matched.length}</span> records</span>
+      <span>Last bar: <span class="meta-val">${lastDt.toISOString().slice(0,16).replace('T',' ')} UTC</span></span>
+      <span>Update: <span class="meta-val">${fmtAgo(new Date(last.up.inferred_at_iso || lastDt))}</span></span>`;
+    // Render up to 500 rows
+    const limit = Math.min(500, matched.length);
+    const tbody = matched.slice(0, limit).map(m => renderHistRow(key, m)).join('');
+    body.innerHTML = `
+      <table class="hist-table">
+        <thead><tr>
+          <th>Candle (UTC)</th>
+          <th class="num">P↓</th><th>↓</th>
+          <th class="num">P↑</th><th>↑</th>
+          <th class="num">Bias</th>
+          <th class="num">Close</th>
+          <th class="num">EMA₅</th>
+        </tr></thead>
+        <tbody>${tbody}</tbody>
+      </table>`;
+  } catch (err) {
+    const msg = (err && (err.message || String(err))) || 'load failed';
+    metaEl.innerHTML = `<span style="color:var(--down);">${escapeHtml(msg)}</span>`;
+    body.innerHTML = `<div class="hist-empty">History unavailable. Daemons may still be initializing.</div>`;
+  }
+}
+
+function renderHistRow(key, m) {
+  const ur = m.up, dr = m.dn;
+  const close = parseFloat(ur.close);
+  const ema   = parseFloat(ur.ema5);
+  const pUp = parseFloat(ur.probability_pct);
+  const pDn = parseFloat(dr.probability_pct);
+  const dt  = ur.open_time_iso ? new Date(ur.open_time_iso) : null;
+  const delta = pUp - pDn;
+  const biasKind = Math.abs(delta) < 5 ? 'neutral' : (delta > 0 ? 'up' : 'down');
+  const biasText = (delta > 0 ? '+' : '') + delta.toFixed(1) + ' pp';
+  const upClass = classify(pUp), dnClass = classify(pDn);
+  const fmtT = dt ? dt.toISOString().slice(5,16).replace('T',' ') : '—';
+  return `<tr>
+    <td class="time">${escapeHtml(fmtT)}</td>
+    <td class="num prob ${dnClass}">${pDn.toFixed(2)}%</td>
+    <td>${escapeHtml(dr.classification || dnClass)}</td>
+    <td class="num prob ${upClass}">${pUp.toFixed(2)}%</td>
+    <td>${escapeHtml(ur.classification || upClass)}</td>
+    <td class="num bias ${biasKind}">${biasText}</td>
+    <td class="num">${fmtPriceFor(key, close)}</td>
+    <td class="num">${fmtPriceFor(key, ema)}</td>
+  </tr>`;
+}
+
+/* ============================================================================
+ *  HISTORICAL INFERENCE TAB — per-asset inspector
+ * ============================================================================ */
+function initInspectorPane(key) {
+  const target = document.getElementById('inference-' + key);
+  const cfg = REGISTRY[key];
+  target.innerHTML = `
+    <section class="card">
+      <header class="card-head">
+        <span class="card-title">${cfg.name} · Historical inference</span>
+        <span class="card-sub" id="resolved-${key}">Pick a UTC date and time</span>
+      </header>
+      <div class="inspect-body">
+        <div class="inspect-controls">
+          <div class="inspect-field">
+            <label>Date <span class="utc-chip">UTC</span></label>
+            <input type="date" id="histDate-${key}">
+          </div>
+          <div class="inspect-field">
+            <label>Time <span class="utc-chip">UTC</span></label>
+            <input type="time" id="histTime-${key}" step="900">
+          </div>
+        </div>
+        <div class="inspect-quick">
+          <button class="inspect-quick-btn" data-shift="-15">−15m</button>
+          <button class="inspect-quick-btn" data-shift="-60">−1h</button>
+          <button class="inspect-quick-btn" data-shift="-360">−6h</button>
+          <button class="inspect-quick-btn" data-shift="-1440">−1d</button>
+          <button class="inspect-quick-btn" data-shift="-10080">−1w</button>
+          <button class="inspect-quick-btn" data-shift="-43200">−30d</button>
+        </div>
+        <button class="btn primary" id="histRun-${key}">
+          <span class="btn-ico">⌚</span>
+          <span>Inspect candle</span>
+        </button>
+        <p class="muted" style="margin-top:12px;font-size:12.5px;">
+          Pick any UTC 15-minute candle that has already closed. The same feature pipeline is evaluated strictly causally at that bar and submitted to both ForestRuntime models via parallel <code>eth_call</code>s. Inputs snap to the nearest closed 15-min boundary. Outcome scoring (whether the ±${cfg.movePct}% target hit within 5h) is shown if enough forward data is available.
+        </p>
+        <div class="inspect-result" id="histResult-${key}"></div>
+      </div>
+    </section>`;
+  wireInspectorPane(key);
+}
+
+function wireInspectorPane(key) {
+  const dateEl    = document.getElementById('histDate-' + key);
+  const timeEl    = document.getElementById('histTime-' + key);
+  const btnEl     = document.getElementById('histRun-' + key);
+  const resolved  = document.getElementById('resolved-' + key);
+  const resultEl  = document.getElementById('histResult-' + key);
+  const cfg = REGISTRY[key];
+  const LAUNCH_MS = Date.parse(cfg.launchDate + 'T00:00:00Z');
+  const snapTo15 = ms => Math.floor(ms / FIFTEEN_MIN_MS) * FIFTEEN_MIN_MS;
+
+  function read() {
+    if (!dateEl.value || !timeEl.value) throw new Error('Pick a date AND time (UTC)');
+    const raw = Date.parse(dateEl.value + 'T' + timeEl.value + ':00Z');
+    if (!isFinite(raw)) throw new Error('Invalid date or time');
+    const snapped = snapTo15(raw);
+    const now = Date.now();
+    if (snapped >= snapTo15(now) - FIFTEEN_MIN_MS) throw new Error('Target must be a closed candle in the past');
+    if (snapped < LAUNCH_MS + 200 * FIFTEEN_MIN_MS) throw new Error(`Target predates ${cfg.symbol} futures history`);
+    return snapped;
+  }
+  function updateReadout() {
+    try {
+      const ms = read();
+      resolved.textContent = 'Resolves to candle ' + new Date(ms).toISOString().slice(0,16).replace('T',' ') + ' UTC';
+      resolved.classList.remove('error');
+    } catch (e) {
+      resolved.textContent = (e && (e.message || String(e))) || 'invalid input';
+      resolved.classList.add('error');
+    }
+  }
+  function setInputs(ms) {
+    const snapped = snapTo15(ms);
+    const d = new Date(snapped);
+    dateEl.value = d.toISOString().slice(0, 10);
+    timeEl.value = d.toISOString().slice(11, 16);
+    updateReadout();
+  }
+
+  // Default 24h ago
+  setInputs(Date.now() - 24 * 3600 * 1000);
+  dateEl.addEventListener('input', updateReadout);
+  timeEl.addEventListener('input', updateReadout);
+
+  document.querySelectorAll(`#inference-${key} .inspect-quick-btn`).forEach(b => {
+    b.addEventListener('click', () => {
+      const d = parseInt(b.dataset.shift, 10);
+      if (!isFinite(d)) return;
+      const raw = Date.parse(dateEl.value + 'T' + (timeEl.value || '00:00') + ':00Z');
+      setInputs((isFinite(raw) ? raw : Date.now() - 24*3600*1000) + d * 60 * 1000);
+    });
+  });
+
+  btnEl.addEventListener('click', async () => {
+    let target;
+    try { target = read(); }
+    catch (e) { updateReadout(); return; }
+    btnEl.disabled = true;
+    btnEl.querySelector('.btn-ico').textContent = '◐';
+    btnEl.querySelector('span:last-child').textContent = 'Inspecting…';
+    resultEl.classList.remove('active');
+    try {
+      const res = await runHistoricalForAsset(key, target);
+      renderInspectorResult(key, target, res, resultEl);
+    } catch (err) {
+      resultEl.classList.add('active');
+      const msg = (err && (err.message || String(err))) || 'inspect failed';
+      resultEl.innerHTML = `<div style="color:var(--down);font-family:var(--font-mono);font-size:13px;">Failed: ${escapeHtml(msg)}</div>`;
+    } finally {
+      btnEl.disabled = false;
+      btnEl.querySelector('.btn-ico').textContent = '⌚';
+      btnEl.querySelector('span:last-child').textContent = 'Inspect candle';
+    }
+  });
+}
+
+async function runHistoricalForAsset(key, targetMs) {
+  const cfg = REGISTRY[key];
+  if (!window.ethers) throw new Error('ethers.js loading; retry shortly');
+  const provider = new ethers.JsonRpcProvider(RPC_URL, { name: 'genesisl1', chainId: CHAIN_ID });
+  const [metaUp, metaDn] = await Promise.all([
+    withRetry(() => resolveModelMeta(provider, cfg.up.tokenId, cfg.up.featureOrder.length)),
+    withRetry(() => resolveModelMeta(provider, cfg.dn.tokenId, cfg.dn.featureOrder.length)),
+  ]);
+  // Fetch lookback + forward window (forward for outcome scoring)
+  const forwardMs = targetMs + 21 * FIFTEEN_MIN_MS;
+  const [klinesPast, klinesFwd, funding] = await Promise.all([
+    withRetry(() => fetchKlinesHistorical(cfg.symbol, targetMs, 251)),
+    // Fetch FORWARD bars by anchoring endTime past the target
+    withRetry(() => fetchKlinesHistorical(cfg.symbol, forwardMs, 30).catch(() => [])),
+    withRetry(() => fetchFundingHistorical(cfg.symbol, targetMs)),
+  ]);
+  if (klinesPast.length < 105) throw new Error(`only ${klinesPast.length} historical bars (need ≥105)`);
+  const { feats, ema5 } = buildAllFeatures(klinesPast, funding);
+  const packedUp = packForOrder(cfg.up.featureOrder, feats, metaUp.scaleQ);
+  const packedDn = packForOrder(cfg.dn.featureOrder, feats, metaDn.scaleQ);
+  const [scoreQUp, scoreQDn] = await Promise.all([
+    withRetry(() => callPredict(provider, metaUp.modelId, packedUp)),
+    withRetry(() => callPredict(provider, metaDn.modelId, packedDn)),
+  ]);
+  const rawUp = Number(scoreQUp) / metaUp.scaleQ;
+  const rawDn = Number(scoreQDn) / metaDn.scaleQ;
+  // Forward bars for outcome
+  const forwardBars = klinesFwd.filter(b => b.t > targetMs).slice(0, 20);
+  return {
+    targetCandle: klinesPast[klinesPast.length - 1],
+    ema5, rawUp, rawDn,
+    pUp: 1/(1+Math.exp(-rawUp)),
+    pDn: 1/(1+Math.exp(-rawDn)),
+    forwardBars,
+  };
+}
+
+function renderInspectorResult(key, targetMs, res, resultEl) {
+  const cfg = REGISTRY[key];
+  const dt = new Date(targetMs);
+  const isoStamp = dt.toISOString().slice(0,16).replace('T',' ') + ' UTC';
+  const { targetCandle, ema5, pUp, pDn, rawUp, rawDn, forwardBars } = res;
+
+  // Outcome scoring
+  let outcomeHtml = '';
+  if (forwardBars.length < 20) {
+    outcomeHtml = `<div class="outcome pending">
+      <div class="o-label">Outcome · pending</div>
+      <div style="margin-top:4px;color:var(--text-3);">Less than 5h of forward data (have ${forwardBars.length}/20 bars).</div>
+    </div>`;
+  } else {
+    const tUp = ema5 * cfg.up.targetMult, sUp = ema5 * cfg.up.stopMult;
+    const tDn = ema5 * cfg.dn.targetMult, sDn = ema5 * cfg.dn.stopMult;
+    let upHit = null, dnHit = null;
+    for (let i = 0; i < forwardBars.length; i++) {
+      const b = forwardBars[i];
+      if (!upHit) {
+        if (b.h >= tUp) upHit = { kind: 'win', bar: i };
+        else if (b.l <= sUp) upHit = { kind: 'stop', bar: i };
+      }
+      if (!dnHit) {
+        if (b.l <= tDn) dnHit = { kind: 'win', bar: i };
+        else if (b.h >= sDn) dnHit = { kind: 'stop', bar: i };
+      }
+      if (upHit && dnHit) break;
+    }
+    const lines = [];
+    let oclass = 'miss';
+    if (upHit && upHit.kind === 'win') {
+      oclass = 'full-up';
+      lines.push(`<strong>+${cfg.movePct}% UP target hit</strong> on bar ${upHit.bar + 1} / 20 (≈ ${(upHit.bar+1)*15}m)`);
+    } else if (upHit && upHit.kind === 'stop') {
+      lines.push(`UP stop −${cfg.retracePct}% hit on bar ${upHit.bar + 1} — invalidated`);
+    } else {
+      lines.push(`UP: neither ±target nor stop hit in 20 bars`);
+    }
+    if (dnHit && dnHit.kind === 'win') {
+      oclass = oclass === 'full-up' ? 'partial' : 'full-dn';
+      lines.push(`<strong>−${cfg.movePct}% DN target hit</strong> on bar ${dnHit.bar + 1} / 20`);
+    } else if (dnHit && dnHit.kind === 'stop') {
+      lines.push(`DN stop +${cfg.retracePct}% hit on bar ${dnHit.bar + 1} — invalidated`);
+    } else {
+      lines.push(`DN: neither target nor stop hit in 20 bars`);
+    }
+    outcomeHtml = `<div class="outcome ${oclass}">
+      <div class="o-label">Outcome · next 5h</div>
+      <div style="margin-top:4px;color:var(--text-2);line-height:1.5;">${lines.map(l=>'· '+l).join('<br>')}</div>
+    </div>`;
+  }
+
+  const delta = (pUp - pDn) * 100;
+  const biasText = Math.abs(delta) < 5 ? `neutral (Δ ${delta.toFixed(1)} pp)`
+                                       : delta > 0 ? `↑ long (Δ +${delta.toFixed(1)} pp)`
+                                                   : `↓ short (Δ ${delta.toFixed(1)} pp)`;
+  const biasStyle = Math.abs(delta) < 5 ? 'var(--text-3)' : (delta > 0 ? 'var(--up)' : 'var(--down)');
+
+  resultEl.classList.add('active');
+  resultEl.innerHTML = `
+    <div class="row">
+      <div class="prob-cell up">
+        <div class="lbl">↑ Model #${cfg.up.tokenId} · P(+${cfg.movePct}%)</div>
+        <div class="val">${(pUp*100).toFixed(2)}%</div>
+        <div class="det">logit ${rawUp.toFixed(3)} · σ(x)</div>
+      </div>
+      <div class="prob-cell dn">
+        <div class="lbl">↓ Model #${cfg.dn.tokenId} · P(−${cfg.movePct}%)</div>
+        <div class="val">${(pDn*100).toFixed(2)}%</div>
+        <div class="det">logit ${rawDn.toFixed(3)} · σ(x)</div>
+      </div>
+    </div>
+    <dl class="meta">
+      <div><dt>Candle open</dt><dd>${isoStamp}</dd></div>
+      <div><dt>OHLC</dt><dd>${fmtPriceFor(key, targetCandle.o)} / ${fmtPriceFor(key, targetCandle.h)} / ${fmtPriceFor(key, targetCandle.l)} / ${fmtPriceFor(key, targetCandle.c)}</dd></div>
+      <div><dt>Volume</dt><dd>${targetCandle.v.toLocaleString('en-US', { maximumFractionDigits: 2 })}</dd></div>
+      <div><dt>EMA₅</dt><dd>${fmtPriceFor(key, ema5)}</dd></div>
+      <div><dt>Bias</dt><dd style="color:${biasStyle};">${biasText}</dd></div>
+      <div><dt>+${cfg.movePct}% target / −${cfg.retracePct}% stop</dt><dd>${fmtPriceFor(key, ema5 * cfg.up.targetMult)} / ${fmtPriceFor(key, ema5 * cfg.up.stopMult)}</dd></div>
+      <div><dt>−${cfg.movePct}% target / +${cfg.retracePct}% stop</dt><dd>${fmtPriceFor(key, ema5 * cfg.dn.targetMult)} / ${fmtPriceFor(key, ema5 * cfg.dn.stopMult)}</dd></div>
+    </dl>
+    ${outcomeHtml}`;
+}
+
+/* ============================================================================
+ *  BACKTEST TAB — per-asset chart, reads from same CSV the daemon writes
+ * ============================================================================ */
+function initBacktestPane(key) {
+  const cfg = REGISTRY[key];
+  const target = document.getElementById('backtest-' + key);
+  target.innerHTML = `
+    <section class="card">
+      <header class="card-head">
+        <span class="card-title">${cfg.name} · Historical signal chart + Binance OHLC backtest</span>
+        <span class="card-sub" id="bt-meta-${key}">Loading…</span>
+      </header>
+      <div style="padding:20px 24px;">
+        <p class="muted" style="font-size:12.5px;margin-bottom:14px;line-height:1.55;">
+          Reads the inner-joined prediction history and scores only strict signals where P↑ &gt; 20% or P↓ &gt; 20%. L1 = full ${cfg.movePct}% favorable move inside 5h; L2 = directionally correct with &gt;${cfg.movePct/2}% favorable move inside 5h; L3 = delayed ${cfg.movePct}% favorable move on the &lt;10h extended horizon. Binance highs used for long outcomes, lows for shorts.
+        </p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px;">
+          <div class="card" style="padding:14px;border:1px solid var(--border-1);box-shadow:none;background:var(--surface-2);">
+            <div class="muted" style="font-size:11px;letter-spacing:.04em;text-transform:uppercase;">Rows loaded</div>
+            <div class="mono" style="font-size:18px;color:var(--text-emph);margin-top:4px;" data-stat="rows">—</div>
+          </div>
+          <div class="card" style="padding:14px;border:1px solid var(--border-1);box-shadow:none;background:var(--surface-2);">
+            <div class="muted" style="font-size:11px;letter-spacing:.04em;text-transform:uppercase;">Binance candles</div>
+            <div class="mono" style="font-size:18px;color:var(--text-emph);margin-top:4px;" data-stat="candles">—</div>
+          </div>
+          <div class="card" style="padding:14px;border:1px solid var(--border-1);box-shadow:none;background:var(--surface-2);">
+            <div class="muted" style="font-size:11px;letter-spacing:.04em;text-transform:uppercase;">Long signals P↑ &gt; 20%</div>
+            <div class="mono" style="font-size:18px;color:var(--text-emph);margin-top:4px;" data-stat="long">—</div>
+          </div>
+          <div class="card" style="padding:14px;border:1px solid var(--border-1);box-shadow:none;background:var(--surface-2);">
+            <div class="muted" style="font-size:11px;letter-spacing:.04em;text-transform:uppercase;">Short signals P↓ &gt; 20%</div>
+            <div class="mono" style="font-size:18px;color:var(--text-emph);margin-top:4px;" data-stat="short">—</div>
+          </div>
+        </div>
+        <div id="bt-canvas-wrap-${key}" style="position:relative;height:420px;border-radius:var(--radius-md);background:var(--surface-2);border:1px solid var(--border-1);overflow:hidden;">
+          <canvas id="bt-canvas-${key}" style="display:block;width:100%;height:100%;"></canvas>
+        </div>
+      </div>
+    </section>`;
+  loadAndRenderBacktest(key);
+}
+
+async function loadAndRenderBacktest(key) {
+  const cfg = REGISTRY[key];
+  const meta = document.getElementById('bt-meta-' + key);
+  const pane = document.getElementById('backtest-' + key);
+  try {
+    // 1. Load inference history from CSVs
+    const [upText, dnText] = await Promise.all([fetchCsv(cfg.up.csv), fetchCsv(cfg.dn.csv)]);
+    const up = parseCsv(upText).rows;
+    const dn = parseCsv(dnText).rows;
+    const upMap = new Map(up.map(r => [r.open_time_ms, r]));
+    const matched = [];
+    for (const dr of dn) {
+      const ur = upMap.get(dr.open_time_ms);
+      if (ur) matched.push({
+        openMs: parseInt(dr.open_time_ms, 10),
+        close: parseFloat(ur.close),
+        ema:   parseFloat(ur.ema5),
+        pUp:   parseFloat(ur.probability_pct),
+        pDn:   parseFloat(dr.probability_pct),
+        upLabel: ur.classification,
+        dnLabel: dr.classification,
+      });
+    }
+    matched.sort((a, b) => a.openMs - b.openMs);
+    // Limit to last 500 for chart sanity
+    const recent = matched.slice(-500);
+    pane.querySelector('[data-stat="rows"]').textContent = String(recent.length);
+    pane.querySelector('[data-stat="long"]').textContent  = String(recent.filter(r => r.pUp > 20).length);
+    pane.querySelector('[data-stat="short"]').textContent = String(recent.filter(r => r.pDn > 20).length);
+
+    if (recent.length === 0) {
+      meta.innerHTML = '<span style="color:var(--down);">no joined rows yet</span>';
+      return;
+    }
+
+    // 2. Fetch Binance OHLC for outcome scoring (last 500 + 40 forward bars)
+    const startMs = recent[0].openMs;
+    const endMs   = recent[recent.length-1].openMs + 40 * FIFTEEN_MIN_MS;
+    let allBins = [];
+    let cursor = startMs;
+    while (cursor < endMs) {
+      const url = `${BINANCE_FAPI}/fapi/v1/klines?symbol=${cfg.symbol}&interval=15m&startTime=${cursor}&endTime=${endMs}&limit=1500`;
+      const chunk = await fetchWithTimeout(url, NET_DEFAULTS.perAttemptMs);
+      if (!Array.isArray(chunk) || chunk.length === 0) break;
+      allBins.push(...chunk.map(k => ({ t: k[0], h: parseFloat(k[2]), l: parseFloat(k[3]), c: parseFloat(k[4]) })));
+      const lastT = chunk[chunk.length-1][0];
+      if (chunk.length < 1500) break;
+      cursor = lastT + 1;
+    }
+    pane.querySelector('[data-stat="candles"]').textContent = String(allBins.length);
+    const binMap = new Map(allBins.map(b => [b.t, b]));
+
+    // 3. Grade each strict signal (L1/L2/L3/X/Pending)
+    const moveFull = cfg.movePct / 100;
+    const moveHalf = (cfg.movePct / 2) / 100;
+    function gradeRow(r) {
+      const ema = r.ema;
+      const targetFullUp = ema * (1 + moveFull);
+      const targetHalfUp = ema * (1 + moveHalf);
+      const targetFullDn = ema * (1 - moveFull);
+      const targetHalfDn = ema * (1 - moveHalf);
+      const isLong = r.pUp > 20;
+      const isShort = r.pDn > 20;
+      // Walk forward bars
+      let fwd5 = [], fwd10 = [];
+      for (let k = 1; k <= 40; k++) {
+        const b = binMap.get(r.openMs + k * FIFTEEN_MIN_MS);
+        if (!b) break;
+        if (k <= 20) fwd5.push(b);
+        fwd10.push(b);
+      }
+      const pending5  = fwd5.length  < 20;
+      const pending10 = fwd10.length < 40;
+      let grade = null;
+      if (isLong) {
+        // L1: full +X% inside 5h?
+        const hit5full = fwd5.some(b => b.h >= targetFullUp);
+        if (hit5full) grade = 'L1';
+        else if (!pending5) {
+          const hit5half = fwd5.some(b => b.h >= targetHalfUp);
+          // L3: full only in extended <10h ?
+          const hit10full = fwd10.some(b => b.h >= targetFullUp);
+          if (hit5half && !hit10full) grade = 'L2';
+          else if (hit10full) grade = 'L3';
+          else if (pending10) grade = 'P';
+          else grade = 'X';
+        } else grade = 'P';
+      } else if (isShort) {
+        const hit5full = fwd5.some(b => b.l <= targetFullDn);
+        if (hit5full) grade = 'L1';
+        else if (!pending5) {
+          const hit5half = fwd5.some(b => b.l <= targetHalfDn);
+          const hit10full = fwd10.some(b => b.l <= targetFullDn);
+          if (hit5half && !hit10full) grade = 'L2';
+          else if (hit10full) grade = 'L3';
+          else if (pending10) grade = 'P';
+          else grade = 'X';
+        } else grade = 'P';
+      }
+      return { ...r, grade, isLong, isShort };
+    }
+    const graded = recent.map(gradeRow);
+    const longHits = graded.filter(g => g.isLong);
+    const shortHits = graded.filter(g => g.isShort);
+    meta.innerHTML = `${recent.length} rows · ${longHits.length} long · ${shortHits.length} short signals`;
+
+    // 4. Draw the chart
+    drawBacktestChart(key, graded, binMap, pane);
+  } catch (err) {
+    const msg = (err && (err.message || String(err))) || 'backtest failed';
+    meta.innerHTML = `<span style="color:var(--down);">${escapeHtml(msg)}</span>`;
+  }
+}
+
+function drawBacktestChart(key, graded, binMap, pane) {
+  const cfg = REGISTRY[key];
+  const canvas = document.getElementById('bt-canvas-' + key);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width  = rect.width  * dpr;
+  canvas.height = rect.height * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const W = rect.width, H = rect.height;
+  ctx.clearRect(0, 0, W, H);
+
+  const cssVar = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const C = {
+    grid: cssVar('--border-1') || '#262626',
+    text: cssVar('--text-3')   || '#888',
+    line: cssVar('--text-emph')|| '#fff',
+    ema:  cssVar('--text-2')   || '#aaa',
+    up:   cssVar('--up')       || '#00d96e',
+    dn:   cssVar('--down')     || '#ff4646',
+    warn: cssVar('--warn')     || '#ffb547',
+    info: cssVar('--info')     || '#5aa4ff',
+  };
+
+  // Layout: top 65% price+signals, bottom 35% prob bars
+  const PAD = 36;
+  const x0 = PAD + 50, x1 = W - PAD;
+  const yPxTop = PAD, yPxBot = H * 0.65;
+  const yProbTop = yPxBot + 16, yProbBot = H - PAD;
+  const priceH = yPxBot - yPxTop;
+  const probH = yProbBot - yProbTop;
+
+  const prices = graded.flatMap(g => [g.close, g.ema]);
+  const allBinPrices = [];
+  for (const b of binMap.values()) {
+    if (b.t >= graded[0].openMs && b.t <= graded[graded.length-1].openMs) {
+      allBinPrices.push(b.h, b.l);
+    }
+  }
+  const allP = prices.concat(allBinPrices).filter(Number.isFinite);
+  let pMin = Math.min(...allP), pMax = Math.max(...allP);
+  const pMid = (pMin + pMax) / 2;
+  const pPad = Math.max(pMid * 0.005, (pMax - pMin) * 0.09);
+  pMin -= pPad; pMax += pPad;
+  const pSpan = pMax - pMin;
+
+  const tMin = graded[0].openMs, tMax = graded[graded.length-1].openMs;
+  const tSpan = Math.max(1, tMax - tMin);
+  const xOf = t => x0 + ((t - tMin) / tSpan) * (x1 - x0);
+  const yOfPrice = p => yPxBot - ((p - pMin) / pSpan) * priceH;
+  const yOfProb  = p => yProbBot - (p / 100) * probH;
+
+  // grid
+  ctx.strokeStyle = C.grid; ctx.lineWidth = 1; ctx.font = '11px ' + cssVar('--font-mono');
+  ctx.fillStyle = C.text; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+
+  // y-axis price ticks
+  const ticks = niceTicks(pMin, pMax, 6);
+  const step = ticks.length > 1 ? Math.abs(ticks[1]-ticks[0]) : (pMax-pMin);
+  const axDp = step >= 10 ? 0 : step >= 1 ? 1 : step >= 0.1 ? 2 : step >= 0.01 ? 3 : 4;
+  ticks.forEach(v => {
+    const y = yOfPrice(v);
+    ctx.strokeStyle = C.grid;
+    ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke();
+    ctx.fillStyle = C.text;
+    ctx.fillText('$' + v.toLocaleString('en-US', { minimumFractionDigits: axDp, maximumFractionDigits: axDp }), x0 - 6, y);
+  });
+  // prob axis lines (0, 20, 50, 100)
+  [0, 20, 50, 100].forEach(p => {
+    const y = yOfProb(p);
+    ctx.strokeStyle = p === 20 ? C.warn : C.grid;
+    ctx.setLineDash(p === 20 ? [3,3] : []);
+    ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = C.text;
+    ctx.fillText(p + '%', x0 - 6, y);
+  });
+  // x-axis date ticks (~7)
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  const nT = 7;
+  for (let k = 0; k <= nT; k++) {
+    const tt = tMin + (k / nT) * tSpan;
+    const x = xOf(tt);
+    ctx.strokeStyle = C.grid;
+    ctx.beginPath(); ctx.moveTo(x, yProbBot); ctx.lineTo(x, yProbBot + 4); ctx.stroke();
+    const d = new Date(tt);
+    const label = d.toISOString().slice(5,10);
+    ctx.fillStyle = C.text;
+    ctx.fillText(label, x, yProbBot + 6);
+  }
+  ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+
+  // Plot close line (from binMap if available, else from graded close)
+  ctx.strokeStyle = C.line; ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  let started = false;
+  for (const g of graded) {
+    const b = binMap.get(g.openMs);
+    const p = b ? b.c : g.close;
+    const x = xOf(g.openMs), y = yOfPrice(p);
+    if (!started) { ctx.moveTo(x, y); started = true; }
+    else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+  // EMA line
+  ctx.strokeStyle = C.ema; ctx.lineWidth = 1; ctx.setLineDash([2, 3]);
+  ctx.beginPath(); started = false;
+  for (const g of graded) {
+    const x = xOf(g.openMs), y = yOfPrice(g.ema);
+    if (!started) { ctx.moveTo(x, y); started = true; }
+    else ctx.lineTo(x, y);
+  }
+  ctx.stroke(); ctx.setLineDash([]);
+
+  // Strict-signal markers + prob bars
+  const gradeColors = { L1: C.up, L2: C.warn, L3: C.info, X: C.text, P: C.text };
+  for (const g of graded) {
+    const x = xOf(g.openMs);
+    if (g.isLong) {
+      const y = yOfPrice(g.close);
+      const col = g.grade === 'L1' ? C.up : g.grade === 'L2' ? C.warn : g.grade === 'L3' ? C.info : g.grade === 'X' ? C.dn : C.text;
+      ctx.fillStyle = col;
+      ctx.beginPath(); ctx.moveTo(x, y - 4); ctx.lineTo(x - 4, y - 11); ctx.lineTo(x + 4, y - 11); ctx.closePath(); ctx.fill();
+      // prob bar
+      ctx.fillStyle = col;
+      ctx.fillRect(x - 1, yOfProb(g.pUp), 2, yOfProb(0) - yOfProb(g.pUp));
+    }
+    if (g.isShort) {
+      const y = yOfPrice(g.close);
+      const col = g.grade === 'L1' ? C.dn : g.grade === 'L2' ? C.warn : g.grade === 'L3' ? C.info : g.grade === 'X' ? C.up : C.text;
+      ctx.fillStyle = col;
+      ctx.beginPath(); ctx.moveTo(x, y + 4); ctx.lineTo(x - 4, y + 11); ctx.lineTo(x + 4, y + 11); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = col;
+      ctx.fillRect(x - 1, yOfProb(0) + 1, 2, (yOfProb(g.pDn) - yOfProb(0)) * -1);
+      // Negate sign so dn bars grow downward from the 0 line; here I'm using the 0% baseline for both
+      // but they go in opposite directions visually via color
+      const dnY = yOfProb(g.pDn);
+      ctx.fillRect(x - 1, yOfProb(0), 2, dnY - yOfProb(0));
+    }
+  }
+
+  // Legend
+  ctx.font = '11px ' + cssVar('--font-mono');
+  ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  const legend = [
+    ['Close', C.line], ['EMA₅', C.ema],
+    ['L1 full ' + cfg.movePct + '%', C.up], ['L2 >' + (cfg.movePct/2) + '%', C.warn],
+    ['L3 <10h', C.info], ['X miss / pending', C.text]
+  ];
+  let lx = x0;
+  for (const [lbl, col] of legend) {
+    ctx.fillStyle = col; ctx.fillRect(lx, 12, 8, 8);
+    ctx.fillStyle = C.text;
+    ctx.fillText(lbl, lx + 12, 16);
+    lx += 12 + ctx.measureText(lbl).width + 16;
+  }
+}
+
+function niceTicks(min, max, count = 6) {
+  const span = Math.max(1e-9, max - min);
+  const rawStep = span / Math.max(1, count - 1);
+  const pow = Math.pow(10, Math.floor(Math.log10(rawStep)));
+  const scaled = rawStep / pow;
+  const step = (scaled <= 1 ? 1 : scaled <= 2 ? 2 : scaled <= 5 ? 5 : 10) * pow;
+  const first = Math.floor(min / step) * step;
+  const out = [];
+  for (let v = first; v <= max + step; v += step) {
+    if (v >= min - step * 0.25) out.push(v);
+    if (out.length > 16) break;
+  }
+  return out;
+}
+
+/* ============================================================================
+ *  MODELS TAB — per-model cards with full provenance + perf metrics
+ * ============================================================================ */
+function renderModelsPane(filter) {
+  const grid = document.getElementById('modelsGrid');
+  const all = [];
+  for (const k of ASSET_KEYS) {
+    all.push({ asset: k, side: 'up', cfg: REGISTRY[k], m: REGISTRY[k].up });
+    all.push({ asset: k, side: 'dn', cfg: REGISTRY[k], m: REGISTRY[k].dn });
+  }
+  const filtered = filter === 'all' ? all
+                                    : all.filter(x => filter === `${x.asset}-${x.side}`);
+  grid.innerHTML = filtered.map(({asset, side, cfg, m}) => renderModelCard(asset, side, cfg, m)).join('');
+}
+
+function renderModelCard(asset, side, cfg, m) {
+  const arrow = side === 'up' ? '↑' : '↓';
+  const dirLabel = side === 'up' ? `+${cfg.movePct}% breakout` : `−${cfg.movePct}% drawdown`;
+  const stopLabel = side === 'up' ? `−${cfg.retracePct}% retrace stop` : `+${cfg.retracePct}% retrace stop`;
+  const targetPct = side === 'up' ? `+${cfg.movePct}%` : `−${cfg.movePct}%`;
+  const stopPct = side === 'up' ? `−${cfg.retracePct}%` : `+${cfg.retracePct}%`;
+  const naive = computeNaiveLogloss(asset, side);
+  const reduction = naive ? (1 - m.testLogloss / naive) * 100 : NaN;
+  return `
+    <section class="card model-card ${side}" data-model="${asset}-${side}">
+      <header class="card-head">
+        <span class="card-title">${cfg.short} ${arrow} · Model #${m.tokenId} · ${dirLabel}</span>
+        <span class="card-sub">${cfg.symbol} · 15m · ${m.featureOrder.length}f</span>
+      </header>
+      <div class="model-body">
+        <dl class="model-perf">
+          <div class="cell"><dt>Test accuracy</dt><dd>${m.testAcc.toFixed(2)}%</dd><div class="note">vs naive baseline</div></div>
+          <div class="cell"><dt>Test LogLoss</dt><dd>${m.testLogloss.toFixed(4)}</dd><div class="note">${Number.isFinite(reduction) ? reduction.toFixed(1) + '% reduction' : 'binary cross-entropy'}</div></div>
+        </dl>
+        <dl class="model-spec">
+          <dt>Symbol</dt><dd>${cfg.symbol} (15m candles)</dd>
+          <dt>Trees · depth</dt><dd>${m.trees.toLocaleString()} · ${m.depth}</dd>
+          <dt>Features</dt><dd>${m.featureOrder.length} causal (no leakage)</dd>
+          <dt>Barriers</dt><dd class="barriers"><span class="ts">${targetPct}</span> target / <span class="ss">${stopPct}</span> · 5h horizon</dd>
+          <dt>EMA × target</dt><dd>×${m.targetMult.toFixed(3)} / ×${m.stopMult.toFixed(3)}</dd>
+          <dt>scaleQ</dt><dd>10⁶ (int32)</dd>
+          <dt>Bins</dt><dd>64 quantile</dd>
+          <dt>NFT id</dt><dd>${m.tokenId} on GenesisL1</dd>
+          <dt>Model id</dt><dd class="hash">${m.modelId}</dd>
+        </dl>
+      </div>
+    </section>`;
+}
+
+function computeNaiveLogloss(asset, side) {
+  // Approximate from test acc: naive logloss = -p_pos*log(p_pos) - p_neg*log(p_neg)
+  // We use the published baselines instead (asset-specific):
+  const naive = {
+    'eth-up': 0.395, 'eth-dn': 0.385,
+    'xrp-up': 0.395, 'xrp-dn': 0.405,
+    'zec-up': 0.440, 'zec-dn': 0.371,
+  };
+  return naive[`${asset}-${side}`];
+}
+
+/* ============================================================================
+ *  BOOTSTRAP
+ * ============================================================================ */
+document.addEventListener('DOMContentLoaded', () => {
+  onTabActivate('overview');
+});
+// If DOMContentLoaded already fired:
+if (document.readyState !== 'loading') onTabActivate('overview');
+
+</script>
+
+</body>
+</html>
