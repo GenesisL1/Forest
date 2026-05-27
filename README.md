@@ -453,9 +453,9 @@ This footer is **not used for inference**, and should be stripped before computi
 
 ---
 
-# Web-exact hyperparameter search — `gl1f_search_web_exact_v2.py`
+# Web-exact hyperparameter search — `gl1f_search.py`
 
-`gl1f_search_web_exact_v2.py` is the **command-line equivalent of the Forest studio's heuristic search button**. It is intended for users who want the same search behavior as the browser UI, but want to run it from a terminal against the local Python or C++ GL1F trainer.
+`gl1f_search.py` is the **command-line equivalent of the Forest studio's heuristic search button**. It is intended for users who want the same search behavior as the browser UI, but want to run it from a terminal against the local Python or C++ GL1F trainer.
 
 This script is deliberately different from a general-purpose optimizer. It does **not** run random search, Optuna, simulated annealing, or an evolutionary strategy. Instead, it mirrors the web UI's small deterministic heuristic loop:
 
@@ -478,7 +478,7 @@ The browser studio is excellent for interactive training, but a hyperparameter s
 - you want to run exact first-run parameters from a JSON object,
 - you want to choose a target metric such as validation loss, test loss, or validation accuracy.
 
-`gl1f_search_web_exact_v2.py` solves that by driving the same trainer CLI repeatedly and reading each resulting `.gl1f` file's `GL1X` footer to decide which round is best.
+`gl1f_search.py` solves that by driving the same trainer CLI repeatedly and reading each resulting `.gl1f` file's `GL1X` footer to decide which round is best.
 
 ## Web parity: what is matched
 
@@ -534,7 +534,7 @@ There are two ways to provide it.
 If you pass normal flags, those flags form the round-1 parameter object:
 
 ```bash
-python gl1f_search_web_exact_v2.py \
+python gl1f_search.py \
     --engine cpp \
     --task regression \
     --input data/btc_vol.csv \
@@ -563,7 +563,7 @@ Round 1 trains those values, after the same web-style clamping described below.
 Use `--initial-params` when you want to paste the same object shape used by the web state. This is the most explicit way to say: “start exactly from these UI params.”
 
 ```bash
-python gl1f_search_web_exact_v2.py \
+python gl1f_search.py \
     --engine cpp \
     --task regression \
     --input data/btc_vol.csv \
@@ -621,7 +621,7 @@ If you pass neither `--initial-params` nor explicit hyperparameter flags, round 
 To print the actual clamped round-1 object without training, use:
 
 ```bash
-python gl1f_search_web_exact_v2.py \
+python gl1f_search.py \
     --task regression \
     --input data/btc_vol.csv \
     --label-col y \
@@ -926,7 +926,7 @@ Each run writes:
 ### Basic regression search with C++ trainer
 
 ```bash
-python gl1f_search_web_exact_v2.py \
+python gl1f_search.py \
     --engine cpp \
     --task regression \
     --input data/btc_vol.csv \
@@ -940,7 +940,7 @@ python gl1f_search_web_exact_v2.py \
 ### Use exact web initial parameters
 
 ```bash
-python gl1f_search_web_exact_v2.py \
+python gl1f_search.py \
     --engine cpp \
     --task regression \
     --input data/btc_vol.csv \
@@ -955,7 +955,7 @@ python gl1f_search_web_exact_v2.py \
 ### Select validation accuracy as the objective
 
 ```bash
-python gl1f_search_web_exact_v2.py \
+python gl1f_search.py \
     --engine cpp \
     --task binary_classification \
     --input data/signals.csv \
@@ -974,7 +974,7 @@ Because `val_acc` maps to `bestValAcc`, the direction is automatically `max`.
 ### Stop when validation loss reaches a target
 
 ```bash
-python gl1f_search_web_exact_v2.py \
+python gl1f_search.py \
     --engine cpp \
     --task regression \
     --input data/train.csv \
@@ -990,7 +990,7 @@ Because `bestValMetric` is loss/error-like, the direction is automatically `min`
 ### Search, then refit on Train+Val
 
 ```bash
-python gl1f_search_web_exact_v2.py \
+python gl1f_search.py \
     --engine cpp \
     --task regression \
     --input data/train.csv \
@@ -1007,7 +1007,7 @@ The search leaderboard still chooses the best round from validation metrics. The
 ### Python trainer with NPZ input
 
 ```bash
-python gl1f_search_web_exact_v2.py \
+python gl1f_search.py \
     --engine python \
     --task regression \
     --input data/train_arrays.npz \
@@ -1022,7 +1022,7 @@ python gl1f_search_web_exact_v2.py \
 ### Multiclass with explicit class count for size clamp
 
 ```bash
-python gl1f_search_web_exact_v2.py \
+python gl1f_search.py \
     --engine cpp \
     --task multiclass_classification \
     --input data/classes.csv \
@@ -1096,16 +1096,15 @@ For multiclass and multilabel tasks, `--n-classes` is important because the mode
 | `--out` | `best_model.gl1f` | Final best model path. |
 | `--work` | `gl1f_search_runs` | Working directory and leaderboard location. |
 
-## Relationship to `gl1f_search.py`
+## Filename contract
 
-This repository may also contain `gl1f_search.py`, an advanced CLI optimizer with random, annealing, evolution, and optional Optuna strategies. That script is useful for broader offline optimization, parallel trials, and more aggressive exploration.
+The command-line web-exact search script is named:
 
-Use `gl1f_search_web_exact_v2.py` when you specifically want the web heuristic behavior:
+```text
+gl1f_search.py
+```
 
-| Script | Search style | Round 1 | Parallelism | Main use case |
-|---|---|---|---|---|
-| `gl1f_search_web_exact_v2.py` | Web UI heuristic | Exact user/base params | Sequential, web-like | Reproduce/mirror browser search. |
-| `gl1f_search.py` | Random/anneal/evolution/Optuna | Sampled optimizer population | Parallel supported | Broader offline hyperparameter optimization. |
+This README documents `gl1f_search.py` as the browser-matching search script. Round 1 is the exact initial parameter set from `--initial-params` or explicit CLI flags; later rounds follow the Forest web UI heuristic; the best model is chosen by `--best-by`; and `--target` is evaluated against that same chosen metric.
 
 ## Reproducibility checklist
 
