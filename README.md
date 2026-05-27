@@ -453,6 +453,688 @@ This footer is **not used for inference**, and should be stripped before computi
 
 ---
 
+# Web-exact hyperparameter search — `gl1f_search_web_exact_v2.py`
+
+`gl1f_search_web_exact_v2.py` is the **command-line equivalent of the Forest studio's heuristic search button**. It is intended for users who want the same search behavior as the browser UI, but want to run it from a terminal against the local Python or C++ GL1F trainer.
+
+This script is deliberately different from a general-purpose optimizer. It does **not** run random search, Optuna, simulated annealing, or an evolutionary strategy. Instead, it mirrors the web UI's small deterministic heuristic loop:
+
+1. **Round 1 trains exactly the current/base UI parameters.**
+2. **Rounds 2..N generate one heuristic candidate at a time.**
+3. Each new candidate is generated from the current best parameters 75% of the time, otherwise from the original base parameters.
+4. The search keeps whichever completed round is best according to the selected footer metric.
+5. If requested, a final `--refit-train-val` pass is run only after the best round is chosen.
+
+Use this script when you want CLI convenience while keeping the same first-run semantics, perturbation formulas, size clamp, seeded RNG, and best-round selection style as the web UI.
+
+## What problem it solves
+
+The browser studio is excellent for interactive training, but a hyperparameter search can be inconvenient in the browser when:
+
+- a dataset is large,
+- the C++ trainer is faster locally,
+- you want reproducible shell commands,
+- you want a saved leaderboard,
+- you want to run exact first-run parameters from a JSON object,
+- you want to choose a target metric such as validation loss, test loss, or validation accuracy.
+
+`gl1f_search_web_exact_v2.py` solves that by driving the same trainer CLI repeatedly and reading each resulting `.gl1f` file's `GL1X` footer to decide which round is best.
+
+## Web parity: what is matched
+
+The script matches the web heuristic search behavior in the places that matter for reproducing the UI search sequence:
+
+- **Round 1 is the exact base/current UI parameter object.**
+- The search RNG is `xorshift32`.
+- The search RNG seed is:
+
+  ```text
+  seed ^ 0x9e3779b9
+  ```
+
+- Round `1` uses `baseParams` directly.
+- Rounds `2..N` use the web-style heuristic candidate generator.
+- Candidate pivot is selected as:
+
+  ```text
+  pivot = bestParams with probability 0.75, otherwise baseParams
+  ```
+
+- Search changes only the web-search hyperparameters:
+  - `trees`
+  - `depth`
+  - `lr`
+  - `minLeaf`
+  - `patience` when early stopping is enabled
+  - plateau LR schedule fields when a plateau schedule is enabled
+
+- Search keeps these fields fixed for comparability:
+  - `task`
+  - `seed`
+  - `splitTrain`
+  - `splitVal`
+  - `bins`
+  - `binning`
+  - `earlyStop`
+  - `nClasses`
+  - class-imbalance settings
+  - selected columns and labels
+  - dataset input
+
+- It uses JavaScript-compatible rounding for candidate generation. Python's built-in `round()` uses banker's rounding, so the script uses its own `js_round()` equivalent of JavaScript `Math.round`.
+
+## Round 1: the initial parameters
+
+In the web UI, the first round is whatever the user has currently set in the training form. The CLI version has the same concept: **round 1 is the initial/base parameter object**.
+
+There are two ways to provide it.
+
+### Option A: normal CLI flags
+
+If you pass normal flags, those flags form the round-1 parameter object:
+
+```bash
+python gl1f_search_web_exact_v2.py \
+    --engine cpp \
+    --task regression \
+    --input data/btc_vol.csv \
+    --label-col y \
+    --trees 300 \
+    --depth 5 \
+    --lr 0.08 \
+    --min-leaf 7 \
+    --bins 64 \
+    --binning quantile \
+    --seed 123 \
+    --early-stop \
+    --patience 30 \
+    --split-train 0.75 \
+    --split-val 0.15 \
+    --trials 20 \
+    --best-by bestValMetric \
+    --out best.gl1f \
+    --work runs/web_exact
+```
+
+Round 1 trains those values, after the same web-style clamping described below.
+
+### Option B: exact web-style JSON object
+
+Use `--initial-params` when you want to paste the same object shape used by the web state. This is the most explicit way to say: “start exactly from these UI params.”
+
+```bash
+python gl1f_search_web_exact_v2.py \
+    --engine cpp \
+    --task regression \
+    --input data/btc_vol.csv \
+    --label-col y \
+    --initial-params '{"trees":300,"depth":5,"lr":0.08,"minLeaf":7,"bins":64,"binning":"quantile","seed":123,"earlyStop":true,"patience":30,"splitTrain":0.75,"splitVal":0.15}' \
+    --trials 20 \
+    --best-by bestValMetric \
+    --out best.gl1f \
+    --work runs/web_exact
+```
+
+`--initial-params` accepts:
+
+- inline JSON:
+
+  ```bash
+  --initial-params '{"trees":250,"depth":4,"lr":0.05}'
+  ```
+
+- a direct file path:
+
+  ```bash
+  --initial-params params.json
+  ```
+
+- an `@file` path:
+
+  ```bash
+  --initial-params @params.json
+  ```
+
+It also accepts a leaderboard-style object containing `params`, or an object containing `best.params`, so you can reuse previous search output.
+
+### Default initial parameters
+
+If you pass neither `--initial-params` nor explicit hyperparameter flags, round 1 uses the same practical defaults as the web training form:
+
+| Parameter | Default | Meaning |
+|---|---:|---|
+| `trees` | `250` | Number of boosting trees, or trees per class/head for v2 tasks. |
+| `depth` | `4` | Fixed tree depth. |
+| `lr` | `0.05` | Learning rate. |
+| `minLeaf` / `--min-leaf` | `10` | Minimum rows per leaf. |
+| `bins` | `32` | Histogram bins for split search. |
+| `binning` | `linear` | `linear` or `quantile`. |
+| `seed` | `42` | Training split/trainer seed and basis for search RNG. |
+| `earlyStop` | `true` | Enable early stopping. |
+| `patience` | `25` | Early-stopping patience. |
+| `splitTrain` | `0.7` | Train split fraction. |
+| `splitVal` | `0.2` | Validation split fraction. |
+| `nClasses` | `2` | Class/label count used for multiclass/multilabel size clamping. |
+| `scaleQ` | `auto` | Trainer quantization scale selection. |
+| `chainId` | `29` | GenesisL1 chain id recorded by the trainer package. |
+
+To print the actual clamped round-1 object without training, use:
+
+```bash
+python gl1f_search_web_exact_v2.py \
+    --task regression \
+    --input data/btc_vol.csv \
+    --label-col y \
+    --initial-params '{"trees":300,"depth":5,"lr":0.08,"minLeaf":7}' \
+    --print-initial-params
+```
+
+This is useful because the script intentionally applies web-style clamps before it trains.
+
+## Web-style clamping
+
+Before round 1, and again after each generated candidate, the script clamps parameters into the same UI-safe ranges:
+
+| Parameter | Clamp |
+|---|---:|
+| `trees` | `10..5000` for v1 tasks; at least `1` for multiclass/multilabel internal trees-per-class logic. |
+| `depth` | `1..12` |
+| `lr` | `0.001..1.0` |
+| `minLeaf` | `1..1000` |
+| `bins` | `8..512` |
+| `patience` | `1..500` |
+| `seed` | `1..2147483647` |
+| `splitTrain` | `50%..90%` |
+| `splitVal` | `5%..40%`, adjusted so train + validation leaves a non-trivial test split. |
+
+It also applies the web model-size safety clamp. The estimated core model size must fit below the configured web size limit. If a candidate is too large, the script reduces `trees` in steps of 25 and then reduces `depth` if needed.
+
+## Candidate-generation formulas
+
+For round `r >= 2`, a candidate is generated from either the current best parameters or the base parameters. The formulas are intentionally small local moves, not a broad global search.
+
+### Trees
+
+```text
+treesFactor = 2 ** ((rand() - 0.5) * 1.4)
+trees = round((pivot.trees * treesFactor) / 25) * 25
+trees = clamp(trees, 10, 5000)
+```
+
+This gives approximately a `×0.62..×1.62` move and snaps tree counts to multiples of 25.
+
+### Depth
+
+```text
+depthStep = Math.round((rand() - 0.5) * 4)
+depth = clamp(pivot.depth + depthStep, 1, 12)
+```
+
+This usually moves depth by about `-2..+2`.
+
+### Learning rate
+
+```text
+lrFactor = 10 ** ((rand() - 0.5) * 0.8)
+lr = clamp(pivot.lr * lrFactor, 0.001, 1.0)
+lr = Math.round(lr * 1_000_000) / 1_000_000
+```
+
+This gives approximately a `×0.40..×2.51` move and rounds to six decimals.
+
+### Minimum leaf size
+
+```text
+minLeafFactor = 2 ** ((rand() - 0.5) * 2.0)
+minLeaf = clamp(Math.round(pivot.minLeaf * minLeafFactor), 1, 1000)
+```
+
+This gives approximately a `×0.5..×2.0` move.
+
+### Early-stopping patience
+
+Patience is perturbed only when early stopping is enabled:
+
+```text
+patienceFactor = 2 ** ((rand() - 0.5) * 1.6)
+patience = clamp(Math.round((pivot.patience * patienceFactor) / 5) * 5, 1, 500)
+```
+
+This gives approximately a `×0.57..×1.74` move and snaps patience to multiples of 5.
+
+### Plateau LR schedule
+
+If `lrSchedule.mode == "plateau"`, the script also perturbs:
+
+- plateau patience,
+- drop percentage,
+- minimum learning rate.
+
+Piecewise schedules are passed through, but the candidate generator does not rewrite the segment string.
+
+## Choosing the metric used to select the best model
+
+By default, the script chooses the best round using:
+
+```text
+bestValMetric
+```
+
+This mirrors the usual training objective:
+
+- regression: validation MSE, lower is better,
+- classification: validation log loss, lower is better.
+
+You can select the objective with any of these equivalent flags:
+
+```bash
+--metric-key bestValMetric
+--best-by bestValMetric
+--objective-metric bestValMetric
+--target-metric bestValMetric
+```
+
+The script reads the chosen key from:
+
+```text
+local.trainMeta.<metricKey>
+```
+
+inside the `.gl1f` file's optional `GL1X` footer.
+
+### Metric aliases
+
+Convenient aliases are supported:
+
+| Alias | Footer key | Direction |
+|---|---|---|
+| `val`, `validation`, `val_loss` | `bestValMetric` | `min` |
+| `test`, `test_loss` | `bestTestMetric` | `min` |
+| `train`, `train_loss` | `bestTrainMetric` | `min` |
+| `val_acc`, `val_accuracy` | `bestValAcc` | `max` |
+| `test_acc`, `test_accuracy` | `bestTestAcc` | `max` |
+| `train_acc`, `train_accuracy` | `bestTrainAcc` | `max` |
+
+Raw footer keys also work. For example:
+
+```bash
+--best-by bestTestMetric
+--best-by bestValAcc
+```
+
+### Direction: min or max
+
+Direction is automatic:
+
+- accuracy-like metrics use `max`,
+- loss/error/metric keys use `min`.
+
+You can override this:
+
+```bash
+--best-by bestValAcc --direction max
+--best-by bestValMetric --direction min
+```
+
+The leaderboard stores both the raw metric and an internal score. For `min`, score is the raw value. For `max`, score is `-raw`, so sorting still puts the best trial first.
+
+### Target stopping
+
+`--target` is evaluated against the selected metric and selected direction.
+
+For loss/error metrics:
+
+```bash
+# stop once bestValMetric <= 0.01
+--best-by bestValMetric --target 0.01
+```
+
+For accuracy metrics:
+
+```bash
+# stop once validation accuracy >= 0.95
+--best-by val_acc --target 0.95
+```
+
+## Refit behavior
+
+`--refit-train-val` follows the web pattern: it is **not used during the search rounds**. Search rounds use the fixed train/validation/test split so scores are comparable.
+
+After the best round is selected, the script optionally trains one final model on Train+Val:
+
+1. copy the best round's parameters,
+2. read `usedTrees` from the best round's `GL1X` footer when available,
+3. set `trees = usedTrees`,
+4. set `earlyStop = false`,
+5. pass `--refit-train-val` to the trainer,
+6. copy the refit model to `--out` if refit succeeds.
+
+The leaderboard records both the best search trial and the optional refit trial.
+
+## Engines
+
+The script can drive either local trainer:
+
+| Engine | Command used | Notes |
+|---|---|---|
+| `python` | `python train_gl1f.py ...` | Supports CSV and the Python trainer's NPZ/NPY options. |
+| `cpp` | `./train_gl1f_cpp ...` | CSV only; usually faster for large tabular datasets. |
+| `auto` | C++ if executable exists, otherwise Python | Default. |
+
+Examples:
+
+```bash
+--engine python --train-script train_gl1f.py
+```
+
+```bash
+--engine cpp --cpp-bin ./train_gl1f_cpp
+```
+
+For `cpp`, the script rejects NPZ/NPY inputs because the C++ trainer expects CSV.
+
+## Data and task flags
+
+The data/task flags are fixed across all rounds:
+
+| Flag | Purpose |
+|---|---|
+| `--task` | Required. One of `regression`, `binary_classification`, `multiclass_classification`, `multilabel_classification`. |
+| `--input` | CSV path, or NPZ path when using `--npz` with the Python engine. |
+| `--label-col` | Single label column for regression, binary, or multiclass. |
+| `--label-cols` | Multiple label columns for multilabel tasks. |
+| `--feature-cols` | Optional comma-separated feature column list. |
+| `--delimiter` | CSV delimiter, default `auto`. |
+| `--no-header` | Treat CSV as headerless. |
+| `--limit-rows` | Optional row cap forwarded to the trainer. |
+| `--neg-label`, `--pos-label` | Explicit binary-class label mapping. |
+| `--class-labels` | Explicit class ordering for multiclass. |
+| `--n-classes` | Class/label count used by the web size clamp for v2 tasks. |
+
+Python-engine array inputs:
+
+| Flag | Purpose |
+|---|---|
+| `--npz` | Interpret `--input` as an NPZ file. |
+| `--npz-x-key` | Feature array key, default `X`. |
+| `--npz-y-key` | Label array key, default `y`. |
+| `--npy-x` | Feature `.npy` path. |
+| `--npy-y` | Label `.npy` path. |
+| `--mmap` | Forward memory-mapping option to the trainer. |
+
+## Class imbalance options
+
+The script can keep the web/class-weighting settings fixed across all rounds:
+
+| Flag | Meaning |
+|---|---|
+| `--imbalance-mode none` | No special weighting. |
+| `--imbalance-mode auto` | Let the trainer compute automatic class/label weights. |
+| `--imbalance-mode manual` | Use explicit weights. |
+| `--imbalance-cap` | Cap automatic weights. |
+| `--imbalance-normalize` / `--no-imbalance-normalize` | Normalize or do not normalize weights. |
+| `--stratify` | Stratify train/val/test split for single-label classification. |
+| `--w0`, `--w1` | Manual binary negative/positive weights. |
+| `--class-weights` | Manual multiclass weights. |
+| `--pos-weights` | Manual multilabel positive weights. |
+
+These values are part of the base parameter object and remain fixed throughout the heuristic search.
+
+## Learning-rate schedule options
+
+The base learning-rate schedule is also part of the initial parameter object.
+
+| Flag | Meaning |
+|---|---|
+| `--lr-schedule none` | No schedule. |
+| `--lr-schedule plateau` | Enable plateau schedule. |
+| `--lr-patience` | Plateau patience. |
+| `--lr-drop-pct` | Plateau drop percentage. |
+| `--lr-min` | Minimum learning rate. |
+| `--lr-schedule piecewise` | Use piecewise schedule. |
+| `--lr-segments` | Trainer segment format, for example `0:100:0.05,100:250:0.01`. |
+
+When plateau mode is active, the heuristic search also perturbs the plateau schedule fields. When piecewise mode is active, the segment string is held fixed.
+
+## Outputs
+
+Each run writes:
+
+| Output | Purpose |
+|---|---|
+| `--out` model file | The best `.gl1f`, or the refit `.gl1f` if `--refit-train-val` succeeds. Default: `best_model.gl1f`. |
+| `--work` directory | Stores all per-round `.gl1f` artifacts and `leaderboard.json`. Default: `gl1f_search_runs`. |
+| `leaderboard.json` | Full machine-readable search record. |
+
+`leaderboard.json` contains:
+
+- mode: `web-exact`,
+- chosen metric,
+- direction,
+- engine,
+- elapsed time,
+- best round,
+- optional refit round,
+- all trials in chronological order,
+- all successful trials sorted by objective,
+- failed trial count,
+- exact reproduction command per trial,
+- trainer metadata parsed from each `GL1X` footer.
+
+## Usage examples
+
+### Basic regression search with C++ trainer
+
+```bash
+python gl1f_search_web_exact_v2.py \
+    --engine cpp \
+    --task regression \
+    --input data/btc_vol.csv \
+    --label-col y \
+    --trials 10 \
+    --best-by bestValMetric \
+    --out best_btc_vol.gl1f \
+    --work runs/btcvol_web_exact
+```
+
+### Use exact web initial parameters
+
+```bash
+python gl1f_search_web_exact_v2.py \
+    --engine cpp \
+    --task regression \
+    --input data/btc_vol.csv \
+    --label-col y \
+    --initial-params '{"trees":250,"depth":4,"lr":0.05,"minLeaf":10,"bins":32,"binning":"linear","seed":42,"earlyStop":true,"patience":25,"splitTrain":0.7,"splitVal":0.2}' \
+    --trials 25 \
+    --best-by val \
+    --out best.gl1f \
+    --work runs/web_exact
+```
+
+### Select validation accuracy as the objective
+
+```bash
+python gl1f_search_web_exact_v2.py \
+    --engine cpp \
+    --task binary_classification \
+    --input data/signals.csv \
+    --label-col breakout \
+    --pos-label yes \
+    --neg-label no \
+    --trials 30 \
+    --best-by val_acc \
+    --target 0.95 \
+    --out best_acc.gl1f \
+    --work runs/signal_acc
+```
+
+Because `val_acc` maps to `bestValAcc`, the direction is automatically `max`.
+
+### Stop when validation loss reaches a target
+
+```bash
+python gl1f_search_web_exact_v2.py \
+    --engine cpp \
+    --task regression \
+    --input data/train.csv \
+    --label-col target \
+    --trials 100 \
+    --best-by bestValMetric \
+    --target 0.001 \
+    --out best_target.gl1f
+```
+
+Because `bestValMetric` is loss/error-like, the direction is automatically `min`.
+
+### Search, then refit on Train+Val
+
+```bash
+python gl1f_search_web_exact_v2.py \
+    --engine cpp \
+    --task regression \
+    --input data/train.csv \
+    --label-col target \
+    --trials 30 \
+    --best-by val \
+    --refit-train-val \
+    --out best_refit.gl1f \
+    --work runs/refit_web_exact
+```
+
+The search leaderboard still chooses the best round from validation metrics. The final output file is the refit model if the refit succeeds.
+
+### Python trainer with NPZ input
+
+```bash
+python gl1f_search_web_exact_v2.py \
+    --engine python \
+    --task regression \
+    --input data/train_arrays.npz \
+    --npz \
+    --npz-x-key X \
+    --npz-y-key y \
+    --trials 20 \
+    --best-by val \
+    --out best_npz.gl1f
+```
+
+### Multiclass with explicit class count for size clamp
+
+```bash
+python gl1f_search_web_exact_v2.py \
+    --engine cpp \
+    --task multiclass_classification \
+    --input data/classes.csv \
+    --label-col label \
+    --class-labels red,green,blue,yellow \
+    --n-classes 4 \
+    --trials 20 \
+    --best-by val_acc \
+    --out best_multiclass.gl1f
+```
+
+For multiclass and multilabel tasks, `--n-classes` is important because the model-size clamp must account for vector-output trees.
+
+## Full CLI reference
+
+### Engine
+
+| Flag | Default | Description |
+|---|---|---|
+| `--engine` | `auto` | `python`, `cpp`, or `auto`. |
+| `--python-exe` | current Python | Python executable for the Python trainer. |
+| `--train-script` | `train_gl1f.py` | Python trainer script path. |
+| `--cpp-bin` | `./train_gl1f_cpp` | C++ trainer executable path. |
+
+### Base hyperparameters
+
+| Flag | Default | Description |
+|---|---:|---|
+| `--trees` | `250` | Round-1 tree count. |
+| `--depth` | `4` | Round-1 tree depth. |
+| `--lr` | `0.05` | Round-1 learning rate. |
+| `--min-leaf` | `10` | Round-1 minimum leaf size. |
+| `--bins` | `32` | Fixed histogram bin count. |
+| `--binning` | `linear` | Fixed binning mode. |
+| `--seed` | `42` | Fixed training seed and search RNG basis. |
+| `--split-train` | `0.7` | Fixed training split fraction. |
+| `--split-val` | `0.2` | Fixed validation split fraction. |
+| `--scaleQ` | `auto` | Trainer quantization scale. |
+| `--chain-id` | `29` | Chain id recorded by trainer package. |
+| `--early-stop` | enabled | Enable early stopping. |
+| `--no-early-stop` | — | Disable early stopping. |
+| `--patience` | `25` | Early-stopping patience. |
+| `--initial-params` | — | Exact round-1 JSON object; overrides base hyperparameter flags. |
+| `--print-initial-params` | — | Print clamped round-1 params and exit. |
+| `--refit-train-val` | — | Final web-style refit after search. |
+
+### Objective and stopping
+
+| Flag | Default | Description |
+|---|---|---|
+| `--metric-key` / `--best-by` | `bestValMetric` | Footer metric used to choose best. |
+| `--direction` | `auto` | `auto`, `min`, or `max`. |
+| `--target` | — | Stop when selected metric reaches this threshold. |
+| `--no-improve-patience` | `0` | Stop after this many rounds without improvement; `0` disables. |
+
+### Search control
+
+| Flag | Default | Description |
+|---|---:|---|
+| `--trials` | `10` | Exact web heuristic rounds. Round 1 is the base params. Clamped to `1..1000`. |
+| `--time-budget` | `0` | Optional seconds budget. `0` disables. |
+| `--trial-timeout` | `1800` | Per-trainer-process timeout in seconds. |
+| `--extra` | empty | Verbatim passthrough flags sent to the trainer. |
+
+### Metadata and output
+
+| Flag | Default | Description |
+|---|---|---|
+| `--title` | empty | Optional trainer package title. |
+| `--description` | empty | Optional trainer package description. |
+| `--out` | `best_model.gl1f` | Final best model path. |
+| `--work` | `gl1f_search_runs` | Working directory and leaderboard location. |
+
+## Relationship to `gl1f_search.py`
+
+This repository may also contain `gl1f_search.py`, an advanced CLI optimizer with random, annealing, evolution, and optional Optuna strategies. That script is useful for broader offline optimization, parallel trials, and more aggressive exploration.
+
+Use `gl1f_search_web_exact_v2.py` when you specifically want the web heuristic behavior:
+
+| Script | Search style | Round 1 | Parallelism | Main use case |
+|---|---|---|---|---|
+| `gl1f_search_web_exact_v2.py` | Web UI heuristic | Exact user/base params | Sequential, web-like | Reproduce/mirror browser search. |
+| `gl1f_search.py` | Random/anneal/evolution/Optuna | Sampled optimizer population | Parallel supported | Broader offline hyperparameter optimization. |
+
+## Reproducibility checklist
+
+To reproduce a run exactly:
+
+1. Keep the same script version.
+2. Keep the same trainer implementation and build.
+3. Keep the same input file and selected columns.
+4. Keep the same `--task`, label mapping, and class/label ordering.
+5. Keep the same round-1 params, either via flags or `--initial-params`.
+6. Keep the same `seed`, `splitTrain`, `splitVal`, `bins`, and `binning`.
+7. Keep the same selected `--best-by` metric and direction.
+8. Keep the full `leaderboard.json`; every trial stores the exact command that produced it.
+
+The `.gl1f` output may include a `GL1X` footer with local training metadata. That footer is useful for leaderboard parsing and mint metadata, but it is not part of core inference. As with all GL1F packaging, strip the footer before computing a deployment `modelId`.
+
+## Practical notes
+
+- `--trials` means exact web rounds. `--trials 10` runs at most 10 trainer processes before optional refit; round 1 is the initial/base parameter set.
+- The script is sequential by design to match the web loop. It does not submit parallel candidates.
+- `bins` and `binning` are intentionally fixed during search. This keeps scores comparable to the UI behavior.
+- For classification accuracy objectives, choose `--best-by val_acc`, `--best-by test_acc`, or `--best-by train_acc`.
+- For loss/error objectives, choose `--best-by val`, `--best-by test`, or `--best-by train`.
+- If a selected metric is missing from the `GL1X` footer, the trial is marked failed and the error message lists the available `trainMeta` keys when possible.
+- For C++ runs, build `train_gl1f_cpp` first and use CSV input.
+- For NPZ/NPY input, use the Python engine.
+
+---
+
 # Headless minting — `model_mint.py`
 
 `model_mint.py` (repo root) is the **command-line equivalent of the Forest studio's Mint tab**. It mirrors the browser/MetaMask flow byte-for-byte, but signs every transaction with a private key from `.env` — so a large model that would otherwise require hundreds of MetaMask confirmations can be deployed unattended in a single run.
