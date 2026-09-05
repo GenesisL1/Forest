@@ -28,6 +28,7 @@
 #include <limits>
 #include <optional>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -55,9 +56,14 @@ static inline std::string now_iso_utc() {
   return out.str();
 }
 
-// Match JavaScript Math.round(x) for finite values: floor(x + 0.5)
+// Match JavaScript Math.round for finite binary64 values, saturating to int64.
+// Check bounds before conversion; adding 0.5 first can cross a half boundary.
 static inline int64_t js_round_double(double x) {
-  return (int64_t)std::floor(x + 0.5);
+  if (std::isnan(x)) throw std::invalid_argument("cannot round NaN");
+  if (x >= (double)std::numeric_limits<int64_t>::max()) return std::numeric_limits<int64_t>::max();
+  if (x <= (double)std::numeric_limits<int64_t>::min()) return std::numeric_limits<int64_t>::min();
+  double lower = std::floor(x);
+  return (int64_t)lower + (x - lower >= 0.5 ? 1 : 0);
 }
 
 static inline int32_t clamp_i32(int64_t x) {
@@ -67,10 +73,7 @@ static inline int32_t clamp_i32(int64_t x) {
 }
 
 static inline int32_t quantize_to_i32(double x, int64_t scaleQ) {
-  // q = clamp_i32(floor(x*scaleQ + 0.5))
-  double qd = std::floor(x * (double)scaleQ + 0.5);
-  if (!std::isfinite(qd)) return 0;
-  return clamp_i32((int64_t)qd);
+  return clamp_i32(js_round_double(x * (double)scaleQ));
 }
 
 static inline double sigmoid(double z) {

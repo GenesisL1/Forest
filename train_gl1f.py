@@ -107,11 +107,10 @@ def now_iso() -> str:
 
 
 def js_round(x: float) -> int:
-    """Match JavaScript Math.round for finite values.
-
-    JS: Math.round(x) == floor(x + 0.5) for all x (with -0 edge which is irrelevant for ints).
-    """
-    return int(math.floor(x + 0.5))
+    """Match JavaScript Math.round for finite binary64 values (ignoring -0)."""
+    lower = math.floor(x)
+    # Adding 0.5 first can round a value immediately below a half upward.
+    return lower + int(x - lower >= 0.5)
 
 
 def clamp_i32(x: int) -> int:
@@ -124,8 +123,11 @@ def clamp_i32(x: int) -> int:
 
 def quantize_to_i32(arr_f: np.ndarray, scaleQ: int) -> np.ndarray:
     """Vectorized quantization: q = clamp_i32(Math.round(x * scaleQ)). Returns int32."""
-    q = np.floor(arr_f.astype(np.float64) * float(scaleQ) + 0.5)
-    q = np.clip(q, INT32_MIN, INT32_MAX)
+    # Saturation before rounding also handles overflow of a finite scaled input.
+    with np.errstate(over="ignore"):
+        scaled = np.clip(arr_f.astype(np.float64) * float(scaleQ), INT32_MIN, INT32_MAX)
+    lower = np.floor(scaled)
+    q = lower + (scaled - lower >= 0.5)
     return q.astype(np.int32, copy=False)
 
 

@@ -567,7 +567,7 @@ SOFTWARE.
       <h3 style="margin-top: 0;">Data split & early stopping</h3>
 
       <label for="seedNum">Seed</label>
-      <input id="seedNum" type="number" value="42" />
+      <input id="seedNum" type="number" min="0" max="2147483647" step="1" value="42" />
       <div class="muted">Controls train/val/test shuffle (based on your split %) and tie-breaking.</div>
 
       <div style="margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border-light);">

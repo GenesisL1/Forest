@@ -119,8 +119,8 @@ integer-quantized gradient-boosted trees. We give specification-level
 sufficient conditions for exact reconstruction, bounded traversal, and
 conforming-evaluator equality under explicit state, manifest, metadata, input,
 access, and accumulation premises. Three trainers produced identical cores for
-25 distinct profiles plus one standalone IEEE-754 witness; an isolated EVM
-study matched 72/72 outputs. At GenesisL1 block 13,342,043, a recorded
+25 distinct profiles; a separate IEEE-754 witness exposed operation-order
+sensitivity. An isolated EVM study matched 72/72 outputs. At GenesisL1 block 13,342,043, a recorded
 provider-attested summary reports reconstruction of 31,185,324 bytes from 12
 records and 108/108 matching local/provider-returned calls. The raw provider
 responses are not included, so this result is a historical observation rather
@@ -1154,8 +1154,8 @@ The browser, Python, and C++ trainers share the following structural choices:
   \item histogram candidate generation with linear or quantile binning;
   \item deterministic feature, row, class, and label ordering under the
   publication profile;
-  \item JavaScript-compatible finite-value rounding
-  \(\lfloor z+1/2\rfloor\), followed by int32 saturation for serialized
+  \item JavaScript-compatible finite-value rounding with ties toward positive
+  infinity, followed by int32 saturation for serialized
   thresholds and leaves;
   \item scalar regression and binary logits in v1;
   \item output-major multiclass or multilabel logits in v2; and
@@ -1337,9 +1337,9 @@ laboratory.
 
 The frozen timing benchmark used Linux 6.18.35 x86-64 with glibc 2.39 on an
 AMD EPYC 9V74 host with nine logical CPUs visible, Python 3.12.13, NumPy
-2.3.5\citep{harris2020numpy}, Node 24.19.0, and g++ 13.3.0. The older EVM-scaling
-and live-chain summary observations retain their recorded Node 24.14.0 provenance.
-The canonical parity matrix and isolated-EVM integration record Node 24.19.0,
+2.3.5\citep{harris2020numpy}, Node 24.19.0, and g++ 13.3.0. The historical
+live-chain summary observations retain their recorded Node 24.14.0 provenance.
+The EVM-scaling benchmark, canonical parity matrix, and isolated-EVM integration record Node 24.19.0,
 which is the release's exact \codeword{.nvmrc} pin. The release does not relabel
 earlier evidence after changing that rerun pin. The benchmarked trainer code is
 single-threaded; the host was neither CPU-pinned nor isolated. The C++ benchmark binary used
@@ -1393,9 +1393,16 @@ coverage; the study reports neither a coverage percentage nor a
 fault-detection rate. In the frozen artifacts, the enabled early-stop and
 plateau configurations do not realize an actual early termination or plateau
 drop; they test option propagation and continued-training parity, not the
-positive control-flow branches. Explicit seed-zero, repeatability, and
-production/reference v2-inference checks are auxiliary controls and are not
+positive control-flow branches. Explicit seed-zero, repeatability,
+binary64 half-boundary training, and production/reference v2-inference checks are auxiliary controls and are not
 additional profiles in the 25-profile training matrix.
+
+The half-boundary control uses scale \(Q=2\) and a learning rate immediately
+below \(1/4\), placing a scaled leaf value immediately below \(1/2\).
+Evaluating \(\lfloor z+1/2\rfloor\) with a binary64 addition can round that
+operand upward before the floor operation. Python and C++ instead compare
+\(z-\lfloor z\rfloor\) with \(1/2\), matching \codeword{Math.round} without
+that extra rounding step; the three engines emit identical control cores.
 
 Across the 25 distinct three-engine training profiles summarized by the suite,
 the JavaScript, Python, and C++ core SHA-256 digests were identical within every

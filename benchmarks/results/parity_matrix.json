@@ -5,14 +5,16 @@
   "scope": "Three separately implemented trainer paths under the recorded finite profiles; not exhaustive path coverage or external replication.",
   "sourceDigests": {
     ".nvmrc": "7e8a2fa94951112b894a3dbe3d05efef5e9263741fa49125f0a70f40fedab4cc",
-    "benchmarks/generate_parity_evidence.py": "42f27d4bb6d100fe3ad8213a2061622404ac85a6d52e24336ca5626822fe264a",
-    "cpp/train_gl1f_cpp.cpp": "4a5cd64c8bef07001fa7e0729e54e85d7b72c10362ad0e87c5e64cc6eeb7020e",
+    "benchmarks/generate_parity_evidence.py": "23bdaf8da34ce41323bdb8892f14f9eed1855527a03060b92f412c62ff3de8c9",
+    "cpp/train_gl1f_cpp.cpp": "1c1e32e63595bc8268b58965dbe6b4afbbe37a26c4c445caf3e8db60be47fbed",
+    "gl1f_search.py": "5a3af73a0103c4b1d624beada16086dbb031903d374b44ff95124e2e2bfd1277",
+    "gl1f_search_web_exact_v2.py": "c06637305d333fc4a4b4cc26abf5c8061c154bde5915b204c4d325de91df249f",
     "package-lock.json": "499eea40ccb1e607875aee52e9c9f95fa65c5011eedd4a3796c23f1e9939eb38",
     "src/train_worker.js": "5d6d17e9b2aab0e295deca7138c2ea8dd3970fa396f96b51b8d014759b000cd2",
     "tests/publication/js_worker_runner.mjs": "d6cd03477d3bc751a1962fb19d47eaff2317e7fc2dd72d36de30c86ae3e8a258",
-    "tests/publication/model_format.py": "5d68bc9d9a18548e26c2873c3a66bd8e818ad65a48b0e9b5de149a41d9d4463b",
-    "tests/publication/test_publication.py": "f7a19dec9710ed875df3f5f4a2529cb9fa4404eab55a8c3b2e6b6523e32ae1f2",
-    "train_gl1f.py": "c19829278f31b77ed87e618d03809439100594c4baaa87f23108d975ab78e08d"
+    "tests/publication/model_format.py": "45d2f9e4d9c8545044cfe259f69dd5d3a29cba2f8ef8364881bdbb7d1a8cbe03",
+    "tests/publication/test_publication.py": "368da585e52cb12657096b3975d0b914d366e5d4374f4d4db33785806050a859",
+    "train_gl1f.py": "e558a0e24aa3e5c264d8e0021a20a871814ca7f969651a9257e4fd8a66503de1"
   },
   "software": {
     "python": "3.12.13",
@@ -22,8 +24,8 @@
   },
   "matrixProfileCount": 25,
   "matrixProfilesAreDistinct": true,
-  "auxiliaryControlCount": 4,
-  "totalProfileExecutions": 29,
+  "auxiliaryControlCount": 5,
+  "totalProfileExecutions": 30,
   "standaloneArithmeticWitnessCount": 1,
   "standaloneArithmeticWitnesses": [
     {
@@ -43,6 +45,19 @@
     }
   ],
   "profiles": [
+    {
+      "profileId": "half-boundary:regression:linear",
+      "evidenceClass": "auxiliary-control",
+      "task": "regression",
+      "binning": "linear",
+      "rows": 240,
+      "features": 1,
+      "engines": ["python", "cpp", "javascript"],
+      "coreSha256": "3f81ddbbe8695cc70e74553b46220c733540c573f28938ab0d079899f1ca2779",
+      "coreBytes": 40,
+      "directCoreBytesEqual": true,
+      "trainingProfileSha256": "be4b73e573e5a7b3c96810aa9767aa3a60753c2c687c7d71790ed706a2a6adf5"
+    },
     {
       "profileId": "inference:multiclass_classification:linear",
       "evidenceClass": "auxiliary-control",

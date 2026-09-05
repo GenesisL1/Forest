@@ -149,10 +149,14 @@ Where:
 All implementations (JS/Python/C++) match:
 
 ```
-Math.round(x)  <=>  floor(x + 0.5)   for finite x
+lower = floor(x)
+roundJS(x) = lower + (x - lower >= 0.5 ? 1 : 0)
 ```
 
-This matches JavaScript `Math.round`, including negative half cases (e.g. -1.5 → -1).
+This matches JavaScript `Math.round` for finite binary64 values, including
+negative half cases (e.g. -1.5 → -1); signed zero is immaterial after integer
+serialization. Evaluating `floor(x + 0.5)` directly in floating point can
+round a value immediately below a half upward and is not equivalent.
 
 ### Choosing scaleQ
 Higher `scaleQ` increases precision but risks overflow in:

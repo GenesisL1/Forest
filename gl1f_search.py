@@ -118,10 +118,12 @@ def js_int32(x: int) -> int:
 def js_round(x: float) -> int:
     """Match JavaScript Math.round for finite values used here.
 
-    Python's round() is banker's rounding, so it does not match JS. JS behaves
-    like floor(x + 0.5) for our numeric candidate-generation use cases.
+    Compare the fractional part with one half to avoid rounding x + 0.5
+    before applying the integer rounding rule. Signed zero is immaterial.
     """
-    return int(math.floor(float(x) + 0.5))
+    x = float(x)
+    lower = math.floor(x)
+    return lower + int(x - lower >= 0.5)
 
 
 def clamp_int(x: Any, lo: int, hi: int) -> int:

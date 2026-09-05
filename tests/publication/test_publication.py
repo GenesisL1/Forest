@@ -35,6 +35,7 @@ from tests.publication.model_format import (
     parse,
     parse_path,
     predict_q,
+    quantize_js,
 )
 
 
@@ -49,6 +50,8 @@ PARITY_SOURCE_FILES = (
     "benchmarks/generate_parity_evidence.py",
     "package-lock.json",
     "train_gl1f.py",
+    "gl1f_search.py",
+    "gl1f_search_web_exact_v2.py",
     "cpp/train_gl1f_cpp.cpp",
     "src/train_worker.js",
     "tests/publication/js_worker_runner.mjs",
@@ -781,6 +784,86 @@ class PublicationParityTests(unittest.TestCase):
         self.assertEqual(actual, expected)
 
     def test_rounding_and_strict_greater_than_boundary(self) -> None:
+        from train_gl1f import clamp_i32, js_round, quantize_to_i32
+        from gl1f_search import js_round as search_round
+        from gl1f_search_web_exact_v2 import js_round as search_v2_round
+
+        values = [
+            -1e308, -2147483648.5, -2.5, -1.5,
+            math.nextafter(-0.5, -math.inf), -0.5,
+            math.nextafter(-0.5, math.inf), -0.0,
+            math.nextafter(0.5, 0.0), 0.5, math.nextafter(0.5, math.inf),
+            1.5, 2.5, 2147483647.5, float(2**52 + 1), 1e308,
+        ]
+        proc = subprocess.run(
+            ["node", "-e",
+             "console.log(JSON.stringify(JSON.parse(process.argv[1]).map(Math.round)))",
+             json.dumps(values)],
+            check=True, capture_output=True, text=True,
+        )
+        rounded = json.loads(proc.stdout)
+        for helper in (js_round, search_round, search_v2_round):
+            self.assertEqual([helper(value) for value in values], rounded)
+        expected = [clamp_i32(value) for value in rounded]
+        self.assertEqual(quantize_to_i32(np.array(values), 1).tolist(), expected)
+        self.assertEqual([quantize_js(value, 1) for value in values], expected)
+        self.assertEqual(
+            quantize_to_i32(np.array([-1e308, 1e308]), 2).tolist(),
+            [-2147483648, 2147483647],
+        )
+        self.assertEqual(
+            [quantize_js(value, 2) for value in (-1e308, 1e308)],
+            [-2147483648, 2147483647],
+        )
+
+        # Compile the production helpers themselves, including their int64
+        # conversion bounds, and compare their clamped results with Node.
+        rounding_source = self.work / "rounding-helper.cpp"
+        rounding_binary = self.work / "rounding-helper"
+        rounding_source.write_text(
+            '#define main gl1f_cli_main\n#include '
+            + json.dumps(str(CPP_SOURCE))
+            + '\n#undef main\nint main(int argc, char** argv) {\n'
+              '  for (int i = 1; i < argc; ++i) {\n'
+              '    double x = std::strtod(argv[i], nullptr);\n'
+              '    std::cout << clamp_i32(js_round_double(x)) << " "\n'
+              '              << quantize_to_i32(x, 1) << " "\n'
+              '              << quantize_to_i32(x, 2) << "\\n";\n'
+              '  }\n}\n',
+            encoding="utf-8",
+        )
+        subprocess.run(
+            ["g++", "-O2", "-std=c++17", "-ffp-contract=off", "-fno-fast-math",
+             str(rounding_source), "-o", str(rounding_binary)],
+            check=True, capture_output=True, text=True,
+        )
+        cpp_result = subprocess.run(
+            [str(rounding_binary), *map(repr, values)],
+            check=True, capture_output=True, text=True,
+        )
+        self.assertEqual(
+            [list(map(int, line.split())) for line in cpp_result.stdout.splitlines()],
+            [[expected[index], expected[index], quantize_js(value, 2)]
+             for index, value in enumerate(values)],
+        )
+
+        # An actual training control: a +1 residual, Q=2, and a learning rate
+        # just below 1/4 yield a leaf immediately below +1/2. The old Python
+        # and C++ add-then-floor helpers emitted 1; JavaScript correctly emits 0.
+        boundary_data = Dataset(
+            feature_names=("x",),
+            X=tuple((float(index % 2),) for index in range(240)),
+            targets={"regression": tuple(float(2 * (index % 2)) for index in range(240))},
+        )
+        trained = self._train_all(
+            "regression", dataset=boundary_data, trees=1, depth=1,
+            learning_rate=math.nextafter(0.25, 0.0), min_leaf=1,
+            scale_q=2, bins=8, suffix="half-boundary",
+        )
+        for trained_package in trained.values():
+            self.assertEqual(trained_package.header.base_q, (2,))
+            self.assertEqual(struct.unpack_from("<ii", trained_package.core, 32), (0, 0))
+
         # v1, one feature, depth=1, one tree, base=3, scale=10,
         # threshold=5, leaves=(-7, 11).
         raw = bytearray(24 + 8 + 8)
@@ -835,6 +918,12 @@ class PublicationParityTests(unittest.TestCase):
         struct.pack_into("<HHI", zero_v2_trees, 6, 1, 1, 0)
         struct.pack_into("<iIH", zero_v2_trees, 14, 0, 100, 2)
         mutations["v2-zero-trees"] = bytes(zero_v2_trees)
+        for constant in ("NaN", "Infinity", "-Infinity"):
+            payload = ('{"nested":[' + constant + ']}').encode("utf-8")
+            mutations[f"footer-constant-{constant}"] = (
+                bytes(valid) + b"GL1X\x01\0\0\0"
+                + struct.pack("<I", len(payload)) + payload
+            )
 
         for name, malformed in mutations.items():
             with self.subTest(name=name), self.assertRaises(FormatError):
@@ -874,6 +963,12 @@ class PublicationParityTests(unittest.TestCase):
         struct.pack_into("<HHI", zero_v2_trees, 6, 1, 1, 0)
         struct.pack_into("<iIH", zero_v2_trees, 14, 0, 100, 2)
         malformed["v2-zero-trees"] = bytes(zero_v2_trees)
+        for constant in ("NaN", "Infinity", "-Infinity"):
+            payload = ('{"nested":[' + constant + ']}').encode("utf-8")
+            malformed[f"footer-constant-{constant}"] = (
+                bytes(valid) + b"GL1X\x01\0\0\0"
+                + struct.pack("<I", len(payload)) + payload
+            )
 
         case_dir = self.work / "malformed-production-js"
         case_dir.mkdir(exist_ok=True)

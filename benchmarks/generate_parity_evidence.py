@@ -45,9 +45,9 @@ def main() -> int:
         )
     if evidence.get("matrixProfilesAreDistinct") is not True:
         raise RuntimeError("designated matrix profile fingerprints are not distinct")
-    if evidence["auxiliaryControlCount"] != 4:
+    if evidence["auxiliaryControlCount"] != 5:
         raise RuntimeError(
-            "expected four auxiliary controls, received "
+            "expected five auxiliary controls, received "
             f"{evidence['auxiliaryControlCount']}"
         )
     if evidence.get("standaloneArithmeticWitnessCount") != 1:

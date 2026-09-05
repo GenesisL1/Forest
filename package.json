@@ -13,7 +13,7 @@
     "test:formal": "python3 -m unittest -v tests.contracts_publication.test_formal_properties",
     "test:archive": "python3 -m unittest -v tests.publication.test_independent_archive",
     "test:science": "python3 tests/scientific_invariants.py --public",
-    "test:ui": "python3 tests/ui_static_check.py",
+    "test:ui": "python3 tests/ui_static_check.py && node tests/ui_seed_parameters.mjs",
     "test:contracts": "node tests/contracts_publication/compile_contracts.mjs",
     "test:evm": "node tests/contracts_publication/test_evm_integration.mjs",
     "verify": "npm run test:mint && npm run test:deployment && npm run test:server && npm run test:wheel && npm run test && npm run test:formal && npm run test:archive && npm run test:science && npm run test:ui && npm run test:contracts && npm run test:evm",

@@ -26,6 +26,11 @@ class FormatError(ValueError):
     """The byte stream violates a canonical GL1F/GL1X invariant."""
 
 
+def _reject_json_constant(token: str) -> None:
+    # Python's JSON decoder otherwise accepts these non-JSON extensions.
+    raise FormatError(f"invalid GL1X JSON constant: {token}")
+
+
 @dataclass(frozen=True)
 class Header:
     version: int
@@ -178,7 +183,10 @@ def parse_gl1f_package(raw: bytes) -> Package:
                 f"({len(trailing)} != {12 + json_length})"
             )
         try:
-            decoded = json.loads(trailing[12:].decode("utf-8"))
+            decoded = json.loads(
+                trailing[12:].decode("utf-8"),
+                parse_constant=_reject_json_constant,
+            )
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
             raise FormatError(f"invalid GL1X JSON: {exc}") from exc
         if not isinstance(decoded, dict):

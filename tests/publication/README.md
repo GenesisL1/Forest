@@ -25,6 +25,8 @@ The suite:
 - exercises class weighting, stratification, Train+Val refit,
   repeated-run determinism, GL1X framing,
   inference, JavaScript-compatible rounding, and malformed byte streams;
+- includes a one-tree regression control whose learning rate places a leaf
+  immediately below a half-integer, plus scalar and saturation witnesses;
 - enables early-stopping and plateau-schedule configurations; in the frozen
   fixtures they reach the full tree budget and do not demonstrate an actual
   early stop or plateau learning-rate reduction;

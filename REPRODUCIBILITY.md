@@ -51,7 +51,7 @@ The individual evidence commands are:
 | Resumable mint workflow | `python3 -m unittest -v tests.publication.test_mint_workflow` |
 | Deployment identity checks | `python3 -m unittest -v tests.publication.test_deployment_identity` |
 | Local trainer server | `python3 -m unittest -v tests.test_local_trainer_server` |
-| Python package build/install | `python3 -m unittest -v tests.publication.test_wheel_package` |
+| Python wheel build and contents | `python3 -m unittest -v tests.publication.test_wheel_package` |
 | Formal boundary witnesses | `python3 -m unittest -v tests.contracts_publication.test_formal_properties` |
 | Offline archive verifier fixtures | `python3 -m unittest -v tests.publication.test_independent_archive` |
 | Paper/result invariants | `python3 tests/scientific_invariants.py --public` |
@@ -66,7 +66,7 @@ write to, or alter GenesisL1.
 
 | Record | Contents |
 |---|---|
-| `benchmarks/results/parity_matrix.json` | 25 distinct JavaScript/Python/C++ training profiles, four auxiliary controls, and one standalone IEEE-754 operation-order witness; status `PASS` |
+| `benchmarks/results/parity_matrix.json` | 25 distinct JavaScript/Python/C++ training profiles, five auxiliary controls, and one standalone IEEE-754 operation-order witness; status `PASS` |
 | `benchmarks/results/evm_integration.json` | Local deployment, chunk reconstruction, content-hash checks, scalar/vector/class inference, 18 view comparisons, two isolated transactions, and zero mismatches |
 | `benchmarks/results/evm_scaling_benchmark.json` | Six scalar shapes and 72 reference/runtime comparisons with zero mismatches |
 | `benchmarks/results/publication_benchmark.json` | Thirty measured runs per engine and workload, including environment and model digests |

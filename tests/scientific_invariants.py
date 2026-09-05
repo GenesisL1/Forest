@@ -136,14 +136,14 @@ def check_parity() -> None:
     require_source_digests(record, "training parity")
     require(record.get("matrixProfileCount") == 25, "parity profile count drift")
     require(record.get("matrixProfilesAreDistinct") is True, "profiles not distinct")
-    require(record.get("auxiliaryControlCount") == 4, "auxiliary control count drift")
-    require(record.get("totalProfileExecutions") == 29, "profile execution count drift")
+    require(record.get("auxiliaryControlCount") == 5, "auxiliary control count drift")
+    require(record.get("totalProfileExecutions") == 30, "profile execution count drift")
     require(
         record.get("standaloneArithmeticWitnessCount") == 1,
         "arithmetic witness count drift",
     )
     profiles = record.get("profiles", [])
-    require(len(profiles) == 29, "parity record count drift")
+    require(len(profiles) == 30, "parity record count drift")
     for profile in profiles:
         label = profile.get("profileId", "unnamed")
         require(profile.get("directCoreBytesEqual") is True, f"{label}: bytes differ")

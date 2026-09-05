@@ -62,6 +62,11 @@ class MintValidationTests(unittest.TestCase):
         packaged = parse_gl1f_package(with_footer(core, {"kind": "GL1F_PACKAGE"}))
         self.assertEqual(packaged.core, core)
         self.assertEqual(packaged.footer, {"kind": "GL1F_PACKAGE"})
+        string_values = {"labels": ["NaN", "Infinity", "-Infinity"]}
+        self.assertEqual(
+            parse_gl1f_package(with_footer(core, string_values)).footer,
+            string_values,
+        )
 
         vector = parse_gl1f_package(canonical_v2())
         self.assertEqual(vector.header.trees_per_output, 1)
@@ -135,6 +140,10 @@ class MintValidationTests(unittest.TestCase):
             "footer length": bytes(footer_length),
             "footer root": non_object,
         }
+        for constant in ("NaN", "Infinity", "-Infinity"):
+            cases[f"footer constant {constant}"] = with_footer(
+                core, {"nested": [float(constant)]}
+            )
         for name, raw in cases.items():
             with self.subTest(name=name), self.assertRaises(FormatError):
                 parse_gl1f_package(raw)

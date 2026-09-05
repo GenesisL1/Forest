@@ -35,6 +35,7 @@ test-science:
 
 test-ui:
 	python3 tests/ui_static_check.py
+	node tests/ui_seed_parameters.mjs
 
 test-contracts:
 	node tests/contracts_publication/compile_contracts.mjs

@@ -25,6 +25,10 @@ class FormatError(ValueError):
     """The byte stream violates a GL1F/GL1X structural invariant."""
 
 
+def _reject_json_constant(token: str) -> None:
+    raise FormatError(f"GL1X payload contains a non-JSON constant: {token}")
+
+
 @dataclass(frozen=True)
 class Header:
     version: int
@@ -164,7 +168,10 @@ def parse(
                 f"GL1X length mismatch: trailing={len(trailing)}, declared={12 + json_len}"
             )
         try:
-            decoded = json.loads(trailing[12:].decode("utf-8"))
+            decoded = json.loads(
+                trailing[12:].decode("utf-8"),
+                parse_constant=_reject_json_constant,
+            )
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
             raise FormatError(f"invalid GL1X JSON: {exc}") from exc
         if not isinstance(decoded, dict):
@@ -181,8 +188,13 @@ def parse_path(path: str | Path, **kwargs: Any) -> Package:
 def quantize_js(value: float, scale_q: int) -> int:
     if not math.isfinite(value):
         raise ValueError("publication profile requires finite feature values")
-    rounded = math.floor(value * scale_q + 0.5)
-    return min(I32_MAX, max(I32_MIN, rounded))
+    scaled = value * scale_q
+    if scaled >= I32_MAX:
+        return I32_MAX
+    if scaled <= I32_MIN:
+        return I32_MIN
+    lower = math.floor(scaled)
+    return lower + int(scaled - lower >= 0.5)
 
 
 def predict_q(package: Package, features: Sequence[float]) -> tuple[int, ...]:

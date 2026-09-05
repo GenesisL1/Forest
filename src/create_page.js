@@ -2773,7 +2773,7 @@ if (ownerKeyAddr && !ownerKeyAddr.value) {
   }
 
   function _ds3dMakeKey({ mode, sampleN, featIdx }) {
-    const seed = clampInt(parseInt(seedNum?.value || "42", 10), 1, 2147483647);
+    const seed = clampInt(parseInt(seedNum?.value || "42", 10), 0, 2147483647);
     const featKey = Array.isArray(featIdx) ? featIdx.join(",") : "";
 
     if (!parsed) return `none|${mode}|k=${sampleN}`;
@@ -2810,7 +2810,7 @@ if (ownerKeyAddr && !ownerKeyAddr.value) {
     if (mode === "scatter3" && d !== 3) throw new Error("3-feature scatter requires exactly 3 feature columns");
 
     const kMax = clampInt(sampleN | 0, 500, 10000);
-    const seed = clampInt(parseInt(seedNum?.value || "42", 10), 1, 2147483647);
+    const seed = clampInt(parseInt(seedNum?.value || "42", 10), 0, 2147483647);
     const rng = _xorshift32(seed ^ 0xC0FFEE);
 
     // Reservoir storage (only keep what we need for plotting)
@@ -3029,7 +3029,7 @@ if (ownerKeyAddr && !ownerKeyAddr.value) {
 
     // Power-iteration on covariance: C v = X^T (X v) / (n-1)
     const nIter = (d > 256) ? 14 : 20;
-    const rng = _xorshift32((clampInt(parseInt(seedNum?.value || "42", 10), 1, 2147483647) ^ 0x9E3779B9) | 0);
+    const rng = _xorshift32((clampInt(parseInt(seedNum?.value || "42", 10), 0, 2147483647) ^ 0x9E3779B9) | 0);
 
     function dotVV(a, b) {
       let s = 0;
@@ -4510,7 +4510,7 @@ if (ownerKeyAddr && !ownerKeyAddr.value) {
     const minLeaf = clampInt(parseInt(minLeafNum.value, 10), parseInt(minLeafNum.min || "1", 10), parseInt(minLeafNum.max || "1000", 10));
     const bins = clampInt(parseInt(binsNum?.value || "32", 10), parseInt(binsNum?.min || "8", 10), parseInt(binsNum?.max || "512", 10));
     const binning = String(binningMode?.value || "linear");
-    const seed = clampInt(parseInt(seedNum.value, 10), 1, 2147483647);
+    const seed = clampInt(parseInt(seedNum.value || "42", 10), 0, 2147483647);
     const earlyStop = !!earlyStopOn.checked;
     const patience = clampInt(parseInt(patienceNum.value, 10), parseInt(patienceNum.min || "1", 10), parseInt(patienceNum.max || "500", 10));
 

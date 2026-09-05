@@ -337,6 +337,13 @@ roundJS(-0.5) = 0
 roundJS( 0.5) = 1
 ```
 
+The formula above uses exact-real arithmetic. For a binary64 operand `z`,
+implementations MUST match `Math.round(z)` before int32 saturation. Evaluating
+`floor(z + 0.5)` in binary64 is not equivalent: for
+`z = 0.49999999999999994`, the addition rounds to `1`, whereas
+`Math.round(z)` returns `0`. The Python and C++ implementations compare the
+fractional part `z - floor(z)` with `0.5` to avoid this extra rounding step.
+
 Implementations MUST reject NaN and positive/negative infinity at the
 scientific input boundary. The mathematical clamp defines saturation for
 finite values whose scaled magnitude is outside int32.

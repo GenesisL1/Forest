@@ -67,7 +67,7 @@ exact-int32 vectors per model. It reports:
 The vectors include the all-zero and both int32-extreme vectors plus two
 non-sentinel root-threshold triplets at \(\theta-1\), \(\theta\), and
 \(\theta+1\). Roots are necessarily visited, so these triplets directly exercise
-strict-greater-than behavior. All 17 archived crossings occurred in token 1's
+strict-greater-than behavior. All 17 reported crossings occurred in token 1's
 v2 paths; token 9 had none in those executed paths. Instrumented reads are
 source-level metrics, not opcode traces. Historical gas estimates are RPC
 simulations, not transaction receipts, inclusion evidence, affordability
