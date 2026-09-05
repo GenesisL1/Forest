@@ -59,6 +59,7 @@
 
 \setlist{nosep,leftmargin=*}
 \setlist[description]{style=nextline,font=\normalfont\bfseries}
+\setlength{\bibsep}{4pt plus 1pt minus 1pt}
 \setlength{\emergencystretch}{2em}
 \renewcommand{\arraystretch}{1.15}
 
@@ -1339,9 +1340,8 @@ The frozen timing benchmark used Linux 6.18.35 x86-64 with glibc 2.39 on an
 AMD EPYC 9V74 host with nine logical CPUs visible, Python 3.12.13, NumPy
 2.3.5\citep{harris2020numpy}, Node 24.19.0, and g++ 13.3.0. The historical
 live-chain summary observations retain their recorded Node 24.14.0 provenance.
-The EVM-scaling benchmark, canonical parity matrix, and isolated-EVM integration record Node 24.19.0,
-which is the release's exact \codeword{.nvmrc} pin. The release does not relabel
-earlier evidence after changing that rerun pin. The benchmarked trainer code is
+The EVM-scaling benchmark, parity matrix, and isolated-EVM integration also
+record Node 24.19.0. The benchmarked trainer code is
 single-threaded; the host was neither CPU-pinned nor isolated. The C++ benchmark binary used
 \codeword{-O3 -DNDEBUG -std=c++17 -ffp-contract=off -fno-fast-math}; the
 publication test binary used
@@ -1466,16 +1466,16 @@ occupy 11,064 bytes.}
 \toprule
 Engine & Regression & Binary\\
 \midrule
-Python & 0.2847 (0.0183) & 0.3074 (0.0146)\\
-C++ & 0.0348 (0.0027) & 0.0421 (0.0028)\\
-Node JS & 0.1355 (0.0105) & 0.1503 (0.0082)\\
+Python & 0.3046 (0.0124) & 0.3149 (0.0177)\\
+C++ & 0.0365 (0.0017) & 0.0437 (0.0027)\\
+Node JS & 0.1384 (0.0088) & 0.1610 (0.0130)\\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The ratios of recorded Python and C++ medians were 8.19 for regression and
-7.30 for binary classification; Python-to-Node median ratios were 2.10 and
-2.05.
+The ratios of recorded Python and C++ medians were 8.35 for regression and
+7.20 for binary classification; Python-to-Node median ratios were 2.20 and
+1.96.
 Regression cores shared SHA-256
 \hashpair{f354c657568232326d43c5a98a0b0ffa}{9392cc9bde7135b7d39c86f7f2d9f259};
 binary cores shared
