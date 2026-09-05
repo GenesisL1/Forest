@@ -29,9 +29,25 @@ export function setupNav({ active = null, logElId = "log" } = {}) {
   const logEl = document.getElementById(logElId);
   const log = makeLogger(logEl);
 
+  // Keep the deployed dApp pages connected to the research record without
+  // duplicating navigation markup across every standalone HTML surface.
+  const siteNav = document.getElementById("siteNav");
+  if (siteNav && !siteNav.querySelector('[data-nav="research"]')) {
+    const researchLink = document.createElement("a");
+    researchLink.className = "btn ghost";
+    researchLink.dataset.nav = "research";
+    researchLink.href = "./research.html";
+    researchLink.textContent = "Research";
+
+    const termsLink = siteNav.querySelector('[data-nav="terms"]');
+    siteNav.insertBefore(researchLink, termsLink || siteNav.firstElementChild);
+  }
+
   document.querySelectorAll("[data-nav]").forEach((el) => {
     const is = el.getAttribute("data-nav") === active;
     el.classList.toggle("primary", is);
+    if (is) el.setAttribute("aria-current", "page");
+    else el.removeAttribute("aria-current");
   });
 
   const connectBtn = document.getElementById("connectBtn");

@@ -4,11 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0a0a0a" id="metaThemeColor">
+<meta name="description" content="A browser-based GL1F trading-support dashboard that reconstructs public GenesisL1 models and compares local with EVM inference under explicit data and RPC limits.">
 <title>GenesisL1 Forest Trading Support Desk · 6 On-chain AI Models</title>
 <link rel="preconnect" href="https://fapi.binance.com" crossorigin>
 <link rel="preconnect" href="https://rpc.genesisl1.org" crossorigin>
 <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.4/ethers.umd.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.4/ethers.umd.min.js"
+  integrity="sha384-C6Zl0Pc8zjSz8KvmNeXRvUQgY4ryFb+BwDvKCmLYcBME0joAaru491tQgi9B7zsMM"
+  crossorigin="anonymous" defer></script>
 <style>
 /* ═══════════════════════════════════════════════════════════════════════════
  * DESIGN TOKENS — Bloomberg-inspired professional trading desk palette
@@ -928,7 +931,7 @@ code { font-family: var(--font-mono); font-size: 12px; background: var(--surface
       <!-- populated dynamically with latest prices -->
     </div>
     <div class="app-bar-actions">
-      <button class="icon-btn" id="themeToggle" title="Toggle theme">
+      <button type="button" class="icon-btn" id="themeToggle" title="Toggle theme">
         <span class="theme-icon-sun">☀</span>
         <span class="theme-icon-moon" style="display:none;">☾</span>
       </button>
@@ -938,24 +941,24 @@ code { font-family: var(--font-mono); font-size: 12px; background: var(--surface
 
 <nav class="tab-bar">
   <div class="tab-bar-inner">
-    <button class="tab active" data-tab="overview">
+    <button type="button" class="tab active" data-tab="overview">
       <span>Web3 AI Desk</span>
       <span class="tab-sub-num">6</span>
     </button>
-    <button class="tab" data-tab="backtest">
+    <button type="button" class="tab" data-tab="backtest">
       <span>Backtest</span>
     </button>
-    <button class="tab" data-tab="history">
+    <button type="button" class="tab" data-tab="history">
       <span>Predictions history</span>
     </button>
-    <button class="tab" data-tab="inference">
+    <button type="button" class="tab" data-tab="inference">
       <span>Blockchain inference</span>
     </button>
-    <button class="tab" data-tab="models">
+    <button type="button" class="tab" data-tab="models">
       <span>On-chain AI models</span>
       <span class="tab-sub-num">6</span>
     </button>
-    <button class="tab" data-tab="about">
+    <button type="button" class="tab" data-tab="about">
       <span>About on-chain AI</span>
     </button>
   </div>
@@ -974,9 +977,9 @@ code { font-family: var(--font-mono); font-size: 12px; background: var(--surface
   <!-- ═══════ BACKTEST TAB ═══════ -->
   <section class="tab-panel" id="panel-backtest">
     <div class="subtab-bar" data-subtab-group="backtest">
-      <button class="subtab active" data-asset="eth"><span class="asset-dot"></span>ETH</button>
-      <button class="subtab" data-asset="xrp"><span class="asset-dot"></span>XRP</button>
-      <button class="subtab" data-asset="zec"><span class="asset-dot"></span>ZEC</button>
+      <button type="button" class="subtab active" data-asset="eth"><span class="asset-dot"></span>ETH</button>
+      <button type="button" class="subtab" data-asset="xrp"><span class="asset-dot"></span>XRP</button>
+      <button type="button" class="subtab" data-asset="zec"><span class="asset-dot"></span>ZEC</button>
     </div>
     <div id="backtestPanes" style="margin-top: 16px;">
       <div class="subtab-panel active" data-asset="eth" id="backtest-eth"></div>
@@ -988,9 +991,9 @@ code { font-family: var(--font-mono); font-size: 12px; background: var(--surface
   <!-- ═══════ HISTORY TAB ═══════ -->
   <section class="tab-panel" id="panel-history">
     <div class="subtab-bar" data-subtab-group="history">
-      <button class="subtab active" data-asset="eth"><span class="asset-dot"></span>ETH</button>
-      <button class="subtab" data-asset="xrp"><span class="asset-dot"></span>XRP</button>
-      <button class="subtab" data-asset="zec"><span class="asset-dot"></span>ZEC</button>
+      <button type="button" class="subtab active" data-asset="eth"><span class="asset-dot"></span>ETH</button>
+      <button type="button" class="subtab" data-asset="xrp"><span class="asset-dot"></span>XRP</button>
+      <button type="button" class="subtab" data-asset="zec"><span class="asset-dot"></span>ZEC</button>
     </div>
     <div id="historyPanes" style="margin-top: 16px;">
       <div class="subtab-panel active" data-asset="eth" id="history-eth"></div>
@@ -1002,9 +1005,9 @@ code { font-family: var(--font-mono); font-size: 12px; background: var(--surface
   <!-- ═══════ HISTORICAL INFERENCE TAB ═══════ -->
   <section class="tab-panel" id="panel-inference">
     <div class="subtab-bar" data-subtab-group="inference">
-      <button class="subtab active" data-asset="eth"><span class="asset-dot"></span>ETH</button>
-      <button class="subtab" data-asset="xrp"><span class="asset-dot"></span>XRP</button>
-      <button class="subtab" data-asset="zec"><span class="asset-dot"></span>ZEC</button>
+      <button type="button" class="subtab active" data-asset="eth"><span class="asset-dot"></span>ETH</button>
+      <button type="button" class="subtab" data-asset="xrp"><span class="asset-dot"></span>XRP</button>
+      <button type="button" class="subtab" data-asset="zec"><span class="asset-dot"></span>ZEC</button>
     </div>
     <div id="inferencePanes" style="margin-top: 16px;">
       <div class="subtab-panel active" data-asset="eth" id="inference-eth"></div>
@@ -1016,13 +1019,13 @@ code { font-family: var(--font-mono); font-size: 12px; background: var(--surface
   <!-- ═══════ MODELS TAB ═══════ -->
   <section class="tab-panel" id="panel-models">
     <div class="subtab-bar" data-subtab-group="models">
-      <button class="subtab active" data-model="all">All 6</button>
-      <button class="subtab" data-model="eth-up"><span class="asset-dot"></span>ETH ↑ #6</button>
-      <button class="subtab" data-model="eth-dn"><span class="asset-dot"></span>ETH ↓ #7</button>
-      <button class="subtab" data-model="xrp-up"><span class="asset-dot"></span>XRP ↑ #8</button>
-      <button class="subtab" data-model="xrp-dn"><span class="asset-dot"></span>XRP ↓ #9</button>
-      <button class="subtab" data-model="zec-up"><span class="asset-dot"></span>ZEC ↑ #10</button>
-      <button class="subtab" data-model="zec-dn"><span class="asset-dot"></span>ZEC ↓ #11</button>
+      <button type="button" class="subtab active" data-model="all">All 6</button>
+      <button type="button" class="subtab" data-model="eth-up"><span class="asset-dot"></span>ETH ↑ #6</button>
+      <button type="button" class="subtab" data-model="eth-dn"><span class="asset-dot"></span>ETH ↓ #7</button>
+      <button type="button" class="subtab" data-model="xrp-up"><span class="asset-dot"></span>XRP ↑ #8</button>
+      <button type="button" class="subtab" data-model="xrp-dn"><span class="asset-dot"></span>XRP ↓ #9</button>
+      <button type="button" class="subtab" data-model="zec-up"><span class="asset-dot"></span>ZEC ↑ #10</button>
+      <button type="button" class="subtab" data-model="zec-dn"><span class="asset-dot"></span>ZEC ↓ #11</button>
     </div>
     <div id="modelsPanes" style="margin-top: 16px;">
       <div class="models-grid" id="modelsGrid"></div>
@@ -1041,7 +1044,7 @@ code { font-family: var(--font-mono); font-size: 12px; background: var(--surface
         <section class="about-section">
           <h2>What you are looking at</h2>
           <p>
-            This page is a <strong>reference implementation</strong> of trustless, fully on-chain machine-learning inference on the <a href="https://genesisl1.com" target="_blank" rel="noopener">GenesisL1</a> blockchain. Six independently trained gradient-boosted decision tree (GBDT) classifiers — three asset pairs of long/short models — are stored as on-chain NFTs on chain id 29. Their <em>weights</em>, <em>tree topology</em>, <em>split thresholds</em>, and <em>leaf values</em> live in contract storage, not on a private API or someone's GPU server. Any caller can submit a feature vector and receive a deterministic prediction by invoking <code>predictView(modelId, packedFeatures)</code> on the <span class="term">ForestRuntime</span> contract.
+            This page is an <strong>experimental reference implementation</strong> of directly executed machine-learning inference on the <a href="https://genesisl1.com" target="_blank" rel="noopener">GenesisL1</a> blockchain. Six gradient-boosted decision tree (GBDT) classifiers — three asset pairs of long/short models — are registered with NFTs on chain id 29. Their serialized tree topology, split thresholds, and leaf values are recoverable from public contract bytecode rather than a private inference API. A caller can submit a feature vector to <code>predictView(modelId, packedFeatures)</code> on the <span class="term">ForestRuntime</span> contract.
           </p>
           <p>
             For a wider context on what this enables and where it's going, see the <a href="https://gl1f.com/gl1f_crypto_pitch_deck.html" target="_blank" rel="noopener">GL1F protocol pitch deck</a>, the <a href="https://genesisl1.com" target="_blank" rel="noopener">GenesisL1.com</a> chain documentation, and the <a href="https://l1coin.com" target="_blank" rel="noopener">L1coin.com</a> ecosystem page.
@@ -1052,15 +1055,15 @@ code { font-family: var(--font-mono); font-size: 12px; background: var(--surface
           <h2>The two innovations that matter</h2>
           <div class="about-grid">
             <div class="about-cell">
-              <h3>1. Trustless inference</h3>
+              <h3>1. Consensus execution</h3>
               <p>
-                Every node executing the EVM transaction runs the <em>same</em> traversal of the <em>same</em> tree ensemble against the <em>same</em> feature vector. They must agree on the output bit-for-bit, or the block doesn't validate. There is no "AI service" to trust — only the chain consensus rules. A model that signed off on a trade in 2026 will sign off on the identical input in 2030 with the identical output.
+                When inference is submitted as a transaction, validating nodes execute the same integer traversal over the same registered bytes and input. An <code>eth_call</code> is instead re-executed by the selected RPC provider and inherits that provider's state and trust assumptions. In both modes, a user can independently replay the public model and input.
               </p>
             </div>
             <div class="about-cell">
-              <h3>2. Public verifiable provenance</h3>
+              <h3>2. Public execution provenance</h3>
               <p>
-                Each model is minted as an NFT. The token id, the model hash (a <code>bytes32</code> commitment to the full serialized model), the feature schema, the bin layout, and the quantization scale (<code>scaleQ = 10⁶</code>) are all on-chain reading. The author, mint time, and any version history are auditable. Nothing about how the model behaves can be silently changed.
+                Each registered model is associated with an NFT and public metadata. The deployed registry records a model identifier, storage pointers, selected dimensions, creator address, and registration time. These records support byte- and execution-level replay; they do not by themselves certify the training data, scientific validity, authorship, or absence of registration front-running.
               </p>
             </div>
           </div>
@@ -1071,7 +1074,7 @@ code { font-family: var(--font-mono); font-size: 12px; background: var(--surface
           <ol class="about-flow">
             <li>
               <span class="step-label">Feature computation</span>
-              <span class="step-desc">The browser (or off-chain daemon) fetches recent OHLCV candles + funding-rate history from a market data source. From this it computes the model's input features locally — 33 strictly causal features for XRP/ZEC, 26 or 27 for ETH. Every operation uses only data observable at the candle's open time; there is no peek-ahead.</span>
+              <span class="step-desc">The browser (or off-chain daemon) fetches recent OHLCV candles and funding-rate history from a market-data source, then computes model inputs locally. The current feature builder uses the completed OHLCV values of the evaluated candle, so a prediction must be timestamped after that candle closes and its forecast horizon must begin after the close.</span>
             </li>
             <li>
               <span class="step-label">Quantization & packing</span>
@@ -1079,7 +1082,7 @@ code { font-family: var(--font-mono); font-size: 12px; background: var(--surface
             </li>
             <li>
               <span class="step-label">On-chain <code>eth_call</code></span>
-              <span class="step-desc">The dApp invokes <code>ForestRuntime.predictView(modelId, packedFeatures)</code> as a <em>view</em> call — gas is free, no transaction is mined, but execution is verified against the same EVM rules. The runtime contract walks the tree ensemble identified by <code>modelId</code>, descending each tree via the quantized feature thresholds, summing leaf values, and returning the raw logit as <code>int256</code>.</span>
+              <span class="step-desc">The dApp invokes <code>ForestRuntime.predictView(modelId, packedFeatures)</code> as an <code>eth_call</code>. No transaction is mined and no consensus receipt is produced: the selected RPC re-executes the runtime against its chosen block state. Users who need independently attested execution should replay locally or submit the corresponding transaction path.</span>
             </li>
             <li>
               <span class="step-label">Sigmoid &amp; presentation</span>
@@ -1089,9 +1092,9 @@ code { font-family: var(--font-mono); font-size: 12px; background: var(--surface
         </section>
 
         <section class="about-section">
-          <h2>GBDT: AI for tabular data</h2>
+          <h2>GBDTs for tabular data</h2>
           <p>
-            Gradient-boosted decision trees are the methodology of choice for predictive modeling on tabular data — the kind of data this dApp works with: OHLCV candles, funding rates, derived volatility and momentum features arranged as rows × columns. The model is an ensemble of shallow decision trees built sequentially, each one trained to correct the residual error of the trees that came before. The final prediction is the sum of every tree's contribution, then mapped through the sigmoid to yield a probability.
+            Gradient-boosted decision trees are a well-established methodology for predictive modeling on tabular data — the kind of data this dApp works with: OHLCV candles, funding rates, derived volatility and momentum features arranged as rows × columns. The model is an ensemble of shallow decision trees built sequentially, each one trained to correct the residual error of the trees that came before. The final prediction is the sum of every tree's contribution, then mapped through the sigmoid to yield a probability.
           </p>
           <p>
             What makes GBDTs the right tool here:
@@ -1099,20 +1102,20 @@ code { font-family: var(--font-mono); font-size: 12px; background: var(--surface
           <ul class="about-bullets">
             <li><strong>Excellent on heterogeneous numeric features.</strong> Returns, volatility ratios, RSI, funding cumulants, hour-of-day, day-of-week — all of these live on different scales and have different relationships to the target. Trees handle this natively: each split is feature-local, so wildly different ranges and units coexist without preprocessing or normalization.</li>
             <li><strong>Captures non-linear interactions automatically.</strong> The model can discover that "high RSI matters more when funding is elevated" without anyone hand-engineering the interaction term. Depth-7 to depth-9 trees explore conjunctions of up to ~7-9 conditions per leaf.</li>
-            <li><strong>Robust to noisy and sparse signals.</strong> Markets are mostly noise. Trees naturally regularize via shallow depth + small leaf counts, and the boosting framework keeps adding only the trees that demonstrably reduce out-of-sample error. With early stopping on a validation split, the trainer halts before overfitting the residuals.</li>
-            <li><strong>Interpretable per-feature attribution.</strong> Permutation importance and split-usage statistics (visible in the per-model spec sheets) show exactly which features the ensemble actually leans on. For ZEC upside the dominant signals are <code>ATR_ratio100</code> and <code>close_to_ema5</code>; for ZEC downside it's <code>hour</code> and <code>funding_cum_24h</code>. The model's behavior is auditable, not opaque.</li>
-            <li><strong>Deterministic at inference time.</strong> A trained tree is a fixed structure of integer comparisons against integer thresholds. With features quantized at <code>scaleQ = 10⁶</code> and stored in the same Q-format, the entire ensemble evaluates to a bit-exact output on every EVM client — which is what makes trustless on-chain verification possible at all.</li>
+            <li><strong>Configurable regularization.</strong> Tree depth, minimum leaf size, learning rate, and validation-based early stopping constrain the fitted ensemble. These controls reduce capacity but do not guarantee generalization.</li>
+            <li><strong>Per-feature diagnostics.</strong> Permutation importance and split-usage statistics (visible in the per-model spec sheets) estimate which features the ensemble relies on. For ZEC upside the leading recorded diagnostics are <code>ATR_ratio100</code> and <code>close_to_ema5</code>; for ZEC downside they are <code>hour</code> and <code>funding_cum_24h</code>. These diagnostics support inspection but are not causal attributions or complete explanations.</li>
+            <li><strong>Deterministic integer inference.</strong> A trained tree is a fixed structure of integer comparisons against integer thresholds. Under the documented canonical-storage, metadata, access-gate, and exact-accumulation premises, the deployed EVM evaluator and a conforming local evaluator return the same integer output. Public model bytes make independent replay practical; an <code>eth_call</code> still inherits the selected RPC provider's chain-state assumptions.</li>
             <li><strong>Compact and cheap to evaluate.</strong> The six models in this dApp range from 1,008 to 2,500 trees with serialized sizes between 2.7 MB and 9.5 MB on-chain. Inference is a tight loop of comparisons; a single <code>predictView</code> call returns in seconds on the GenesisL1 RPC.</li>
           </ul>
           <p>
-            Empirically, this combination delivers 60-65% logloss reductions against the naive class-prior baseline on held-out windows, with test accuracies of 93-96% across the six models (see the On-chain AI models tab for per-model numbers).
+            The model cards report exploratory metrics from the original deployment. They are not a publication-grade trading result without archived datasets, chronological walk-forward evaluation with purge/embargo, a locked final test period, class-prevalence baselines, calibration and precision–recall analysis, and a pre-registered scoring rule.
           </p>
         </section>
 
         <section class="about-section">
           <h2>What this dApp does NOT do</h2>
           <ul class="about-do-not">
-            <li><strong>Training is off-chain.</strong> Models are trained on historical data using a custom C++/Python trainer (open source under CC BY-SA 4.0). What is on-chain is the resulting frozen ensemble — its weights and topology — not the training procedure. Once minted, a model is immutable.</li>
+            <li><strong>Training is off-chain.</strong> Models are trained on historical data using the repository's browser, C++, or Python trainer (open source under the repository's MIT license). What is registered is the resulting frozen ensemble, not a proof of the training procedure or dataset.</li>
             <li><strong>Market data is off-chain.</strong> Candles and funding history come from Binance Futures via the dApp's <code>fetch</code> calls. The chain has no oracle for them. This is a deliberate architecture choice — the on-chain part is the <em>verifiable computation</em>; getting fresh inputs into the EVM is a separate (and well-understood) oracle problem.</li>
             <li><strong>No order execution.</strong> This is a prediction surface, not an automated trading system. Probabilities are emitted; humans (or downstream contracts) act on them. The dApp explicitly does not place trades.</li>
           </ul>
@@ -1123,7 +1126,7 @@ code { font-family: var(--font-mono); font-size: 12px; background: var(--surface
           <ul class="about-tab-guide">
             <li><strong>Web3 AI Desk</strong> — live snapshot of all six models, latest predictions for each asset pair. Click <em>Run all 6 on-chain inferences</em> to fire six parallel <code>predictView</code> calls against the chain.</li>
             <li><strong>Backtest</strong> — historical chart of each prediction overlaid on actual price action, with strict-signal grading (full target hit, half-target only, delayed hit, missed, pending).</li>
-            <li><strong>Predictions history</strong> — table of every model output produced so far, inner-joined across the long/short pair for each asset.</li>
+            <li><strong>Predictions history</strong> — local daemon CSV output, inner-joined across the long/short pair for each asset. It is not an on-chain or tamper-evident log.</li>
             <li><strong>Blockchain inference</strong> — pick any past 15-minute candle, run both models against it strictly causally, see what they would have said in real time. Outcome scoring against the actual ±target move follows automatically when ≥5h of forward data exists.</li>
             <li><strong>On-chain AI models</strong> — per-model spec sheet: token id, model hash, test metrics, hyperparameters, barrier configuration.</li>
           </ul>
@@ -1133,7 +1136,7 @@ code { font-family: var(--font-mono); font-size: 12px; background: var(--surface
           <h2>Links</h2>
           <div class="about-links">
             <a href="https://gl1f.com/GL1F.pdf" target="_blank" rel="noopener" class="about-link">
-              <span class="about-link-title">GL1F whitepaper</span>
+              <span class="about-link-title">GL1F research paper</span>
               <span class="about-link-host">gl1f.com/GL1F.pdf</span>
             </a>
             <a href="https://gl1f.com/gl1f_crypto_pitch_deck.html" target="_blank" rel="noopener" class="about-link">
@@ -1167,13 +1170,13 @@ code { font-family: var(--font-mono); font-size: 12px; background: var(--surface
 
 <footer class="footer">
   <div class="legend">
-    <span class="legend-item">License · CC BY-SA 4.0</span>
+    <span class="legend-item">Repository license · MIT</span>
     <span class="legend-item">Registry · 0x33c9844F77a07e36B98f0FFf8201B8A8b02c2a69</span>
     <span class="legend-item">Runtime · 0xD2fD0cf461a6cb56Fc08d9aEc120833D8E79044E</span>
     <span class="legend-item">Chain ID · 29</span>
   </div>
   <p class="disclaimer">
-    Experimental research deployment. Probabilities are out-of-sample model outputs evaluated deterministically on-chain via <code>predictView</code>; they are NOT investment advice. Out-of-sample test accuracy on a fixed window does not guarantee future performance. Markets evolve; regimes shift. Treat any signal as a hypothesis, not a directive.
+    Experimental research deployment. Probabilities returned by <code>predictView</code> are NOT investment advice. The displayed evaluation has not been independently reproduced from an archived dataset, and fixed-window accuracy does not establish future performance. Treat every signal as a hypothesis, not a directive.
   </p>
 </footer>
 
@@ -2514,14 +2517,14 @@ function initInspectorPane(key) {
           </div>
         </div>
         <div class="inspect-quick">
-          <button class="inspect-quick-btn" data-shift="-15">−15m</button>
-          <button class="inspect-quick-btn" data-shift="-60">−1h</button>
-          <button class="inspect-quick-btn" data-shift="-360">−6h</button>
-          <button class="inspect-quick-btn" data-shift="-1440">−1d</button>
-          <button class="inspect-quick-btn" data-shift="-10080">−1w</button>
-          <button class="inspect-quick-btn" data-shift="-43200">−30d</button>
+          <button type="button" class="inspect-quick-btn" data-shift="-15">−15m</button>
+          <button type="button" class="inspect-quick-btn" data-shift="-60">−1h</button>
+          <button type="button" class="inspect-quick-btn" data-shift="-360">−6h</button>
+          <button type="button" class="inspect-quick-btn" data-shift="-1440">−1d</button>
+          <button type="button" class="inspect-quick-btn" data-shift="-10080">−1w</button>
+          <button type="button" class="inspect-quick-btn" data-shift="-43200">−30d</button>
         </div>
-        <button class="btn primary" id="histRun-${key}">
+        <button type="button" class="btn primary" id="histRun-${key}">
           <span class="btn-ico">⌚</span>
           <span>Inspect candle</span>
         </button>

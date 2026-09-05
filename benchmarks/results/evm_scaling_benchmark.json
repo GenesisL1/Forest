@@ -1,0 +1,322 @@
+{
+  "schemaVersion": 1,
+  "status": "PASS",
+  "recordedAt": "2026-07-24T21:54:19.120Z",
+  "source": {
+    "revision": "ee489ab1c6a66e8e9989184b57343a7abfbe59c3",
+    "dirty": false
+  },
+  "environment": {
+    "platform": "linux",
+    "release": "6.12.13",
+    "architecture": "x64",
+    "cpu": "AMD EPYC 9V74 80-Core Processor",
+    "logicalCpuCount": 9,
+    "node": "v24.14.0"
+  },
+  "compiler": {
+    "version": "0.8.20+commit.a1b79de6.Emscripten.clang",
+    "viaIR": true,
+    "optimizerRuns": 200,
+    "evmVersion": "istanbul",
+    "compileMs": 39425,
+    "runtimeBytes": {
+      "ForestRuntime": 17794,
+      "ModelStore": 714,
+      "ModelRegistry": 12725,
+      "ModelNFT": 5968
+    }
+  },
+  "chain": {
+    "engine": "ganache 7.9.2",
+    "chainId": 1337,
+    "hardfork": "shanghai"
+  },
+  "deploymentGas": {
+    "ModelStore": "207748",
+    "ModelRegistry": "3072496",
+    "ModelNFT": "1404451",
+    "ForestRuntime": "3897154"
+  },
+  "design": {
+    "chunkSize": 20000,
+    "uniqueSharedVectors": 12,
+    "comparisonsPerProfile": 12,
+    "vectorSeed": 20260724,
+    "featureRangeQInclusive": [
+      -3000,
+      3000
+    ],
+    "featureCount": 2,
+    "scaleQ": 1000
+  },
+  "profiles": [
+    {
+      "trees": 20,
+      "depth": 3,
+      "modelId": "0x1832015fcb1647d9382dcd7256fe1574eef39047b7e9bde6b5b970267774e066",
+      "coreBytes": 1784,
+      "chunkSize": 20000,
+      "chunks": 1,
+      "work": {
+        "decisions": 60,
+        "leafReads": 20,
+        "primitiveReads": 140
+      },
+      "publicationGas": {
+        "chunkWrites": [
+          "436897"
+        ],
+        "tableWrite": "63383",
+        "registration": "737809"
+      },
+      "estimatedGas": {
+        "raw": [
+          "286280",
+          "286238",
+          "286239",
+          "286273",
+          "286254",
+          "286270",
+          "286211",
+          "286236",
+          "286235",
+          "286246",
+          "286235",
+          "286246"
+        ],
+        "min": "286211",
+        "median": 286242.5,
+        "mean": 286246.9166666667,
+        "max": "286280"
+      }
+    },
+    {
+      "trees": 50,
+      "depth": 3,
+      "modelId": "0x62daf4bbf8c3ff6e099f9e2b8caef6e60b7ed59013198d1d2532512894f38735",
+      "coreBytes": 4424,
+      "chunkSize": 20000,
+      "chunks": 1,
+      "work": {
+        "decisions": 150,
+        "leafReads": 50,
+        "primitiveReads": 350
+      },
+      "publicationGas": {
+        "chunkWrites": [
+          "998781"
+        ],
+        "tableWrite": "63383",
+        "registration": "689309"
+      },
+      "estimatedGas": {
+        "raw": [
+          "644535",
+          "644436",
+          "644439",
+          "644525",
+          "644455",
+          "644511",
+          "644382",
+          "644432",
+          "644431",
+          "644447",
+          "644410",
+          "644447"
+        ],
+        "min": "644382",
+        "median": 644443,
+        "mean": 644454.1666666666,
+        "max": "644535"
+      }
+    },
+    {
+      "trees": 50,
+      "depth": 4,
+      "modelId": "0x0a3157b5850f5246df7f5bf46ae1a8892ce1b96945bf76bfe1ce18896e8fe0f6",
+      "coreBytes": 9224,
+      "chunkSize": 20000,
+      "chunks": 1,
+      "work": {
+        "decisions": 200,
+        "leafReads": 50,
+        "primitiveReads": 450
+      },
+      "publicationGas": {
+        "chunkWrites": [
+          "2014181"
+        ],
+        "tableWrite": "63383",
+        "registration": "689297"
+      },
+      "estimatedGas": {
+        "raw": [
+          "810888",
+          "810754",
+          "810755",
+          "810880",
+          "810763",
+          "810860",
+          "810689",
+          "810752",
+          "810746",
+          "810758",
+          "810726",
+          "810758"
+        ],
+        "min": "810689",
+        "median": 810756.5,
+        "mean": 810777.4166666666,
+        "max": "810888"
+      }
+    },
+    {
+      "trees": 100,
+      "depth": 4,
+      "modelId": "0xd87a6bbc8ec2449f001677bbe028c76447c6b6c28813ef99eb26251840533922",
+      "coreBytes": 18424,
+      "chunkSize": 20000,
+      "chunks": 1,
+      "work": {
+        "decisions": 400,
+        "leafReads": 100,
+        "primitiveReads": 900
+      },
+      "publicationGas": {
+        "chunkWrites": [
+          "3939971"
+        ],
+        "tableWrite": "63383",
+        "registration": "689309"
+      },
+      "estimatedGas": {
+        "raw": [
+          "1577114",
+          "1576943",
+          "1576936",
+          "1577106",
+          "1576885",
+          "1577086",
+          "1576732",
+          "1576951",
+          "1576908",
+          "1576943",
+          "1576821",
+          "1576909"
+        ],
+        "min": "1576732",
+        "median": 1576939.5,
+        "mean": 1576944.5,
+        "max": "1577114"
+      }
+    },
+    {
+      "trees": 200,
+      "depth": 4,
+      "modelId": "0xd53a54b4b0f4fba537775fa5ece0ac2904a1ea49666767fc34c369a5c9d6829b",
+      "coreBytes": 36824,
+      "chunkSize": 20000,
+      "chunks": 2,
+      "work": {
+        "decisions": 800,
+        "leafReads": 200,
+        "primitiveReads": 1800
+      },
+      "publicationGas": {
+        "chunkWrites": [
+          "4273664",
+          "3607380"
+        ],
+        "tableWrite": "70168",
+        "registration": "689321"
+      },
+      "estimatedGas": {
+        "raw": [
+          "3121528",
+          "3121204",
+          "3121190",
+          "3121509",
+          "3121104",
+          "3121468",
+          "3120837",
+          "3121218",
+          "3121137",
+          "3121206",
+          "3120986",
+          "3121138"
+        ],
+        "min": "3120837",
+        "median": 3121197,
+        "mean": 3121210.4166666665,
+        "max": "3121528"
+      }
+    },
+    {
+      "trees": 50,
+      "depth": 6,
+      "modelId": "0x7fc4fe7c97e6ffb118d188830b9873946ab5c16adc901cdb223ce9f467a0505d",
+      "coreBytes": 38024,
+      "chunkSize": 20000,
+      "chunks": 2,
+      "work": {
+        "decisions": 300,
+        "leafReads": 50,
+        "primitiveReads": 650
+      },
+      "publicationGas": {
+        "chunkWrites": [
+          "4275368",
+          "3858827"
+        ],
+        "tableWrite": "70168",
+        "registration": "689309"
+      },
+      "estimatedGas": {
+        "raw": [
+          "1146566",
+          "1146388",
+          "1146391",
+          "1146551",
+          "1146390",
+          "1146526",
+          "1146275",
+          "1146386",
+          "1146369",
+          "1146408",
+          "1146327",
+          "1146396"
+        ],
+        "min": "1146275",
+        "median": 1146390.5,
+        "mean": 1146414.4166666667,
+        "max": "1146566"
+      }
+    }
+  ],
+  "totalComparisons": 72,
+  "mismatches": 0,
+  "fits": [
+    {
+      "x": "decisions",
+      "interceptGas": 45474.153,
+      "slopeGasPerUnit": 3828.902049,
+      "rSquared": 0.99937982,
+      "maxAbsoluteRelativeResidual": 0.04163447
+    },
+    {
+      "x": "primitiveReads",
+      "interceptGas": 42923.392,
+      "slopeGasPerUnit": 1708.276802,
+      "rSquared": 0.99998002,
+      "maxAbsoluteRelativeResidual": 0.01454958
+    }
+  ],
+  "totalRuntimeMs": 130457,
+  "limitations": [
+    "One host, compiler, client, hardfork, chunk geometry, and synthetic model family.",
+    "eth_estimateGas observations are not mined inference receipts or live-network fees.",
+    "The fit is descriptive over six points and is not a protocol gas theorem.",
+    "Actual gas can vary with selected chunks and address warmth even when decision counts are fixed."
+  ]
+}

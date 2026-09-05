@@ -1,0 +1,93 @@
+{
+  "manifest": "gl1f-deployment/v1",
+  "network": {
+    "name": "GenesisL1",
+    "chainId": 29,
+    "nativeCurrency": {
+      "name": "L1 coin",
+      "symbol": "L1",
+      "decimals": 18
+    },
+    "rpcUrl": "https://rpc.genesisl1.org"
+  },
+  "application": {
+    "name": "GenesisL1 Forest",
+    "url": "https://gl1f.com",
+    "source": "https://github.com/GenesisL1/Forest",
+    "status": "live"
+  },
+  "contracts": {
+    "modelStore": {
+      "address": "0x9CdbC23392648Bd27B4A5eD09c0fEa9452454B54",
+      "source": "contracts/ModelStore.sol",
+      "runtimeCodeBytesAtWitnessBlock": 714,
+      "runtimeCodeSha256AtWitnessBlock": "cb9534496adf4e4c4464d5c3063e5e9a93fbfbe931e568e6307901e4d76a6f76",
+      "runtimeCodeKeccak256AtWitnessBlock": "0xe8bbff9c37c91122602802c7a3fdd5355ffc051acdb05188cfbd547106d235a5",
+      "role": "Deploys immutable GL1C bytecode chunks."
+    },
+    "modelRegistry": {
+      "address": "0x33c9844F77a07e36B98f0FFf8201B8A8b02c2a69",
+      "source": "contracts/ModelRegistry.sol",
+      "runtimeCodeBytesAtWitnessBlock": 12725,
+      "runtimeCodeSha256AtWitnessBlock": "1c51a8c8ee6f8405ee4a19579cb659f80bb58a5de66ca0e3268226d473804da5",
+      "runtimeCodeKeccak256AtWitnessBlock": "0x159a4f55c4d64e8f1daaa47429073e28131e6df25256f5e1409ed2ca6559c24a",
+      "role": "Indexes model manifests, metadata, settings, and access plans."
+    },
+    "modelNft": {
+      "address": "0x44Dc1c54B8D579B42d78cC21cf8260DC0A3279fA",
+      "source": "contracts/ModelNFT.sol",
+      "runtimeCodeBytesAtWitnessBlock": 5968,
+      "runtimeCodeSha256AtWitnessBlock": "e9c5c9fb8cd8d96948f5e0260636761feb9f37c4509e0835baf83e0ef742b841",
+      "runtimeCodeKeccak256AtWitnessBlock": "0x6ca65889cb653363fd22f8e7b480493cc8c19f16e2b624f8aff11aed294743d3",
+      "role": "Represents registered models as custom transferable model-token records."
+    },
+    "forestRuntime": {
+      "address": "0xD2fD0cf461a6cb56Fc08d9aEc120833D8E79044E",
+      "source": "contracts/ForestRuntime.sol",
+      "runtimeCodeBytesAtWitnessBlock": 17794,
+      "runtimeCodeSha256AtWitnessBlock": "48b0809cb9946adcdcacf3c50842fd1da92e4154149e777f5a1cee9b74540219",
+      "runtimeCodeKeccak256AtWitnessBlock": "0xeacdd3d0f7034aa2e7c37402eba6e9841b811a6da5fd2ab15a32465fbb04fa59",
+      "role": "Executes scalar, class, and vector GL1F inference."
+    },
+    "modelMarketplace": {
+      "address": "0xA9bfa0a719b7F73cE85CA1E7f23af626D383fB46",
+      "source": "contracts/ModelMarketplace.sol",
+      "runtimeCodeBytesAtWitnessBlock": 3828,
+      "runtimeCodeSha256AtWitnessBlock": "8e31185e7628a542fdc89621399556bcbfe6897c320c3901d6c2fcd4a6c7764b",
+      "runtimeCodeKeccak256AtWitnessBlock": "0x2bbd1b7ee9e460c4614c84d119d93f9c81b9559c501deb27dd9f1c1e04765c0e",
+      "role": "Lists and transfers model-token records for fixed-price settlement."
+    }
+  },
+  "evidence": {
+    "witnessBlock": {
+      "number": 13342043,
+      "hash": "0xffd825db1bb2534052a604db9584d361111d8bc9e19d753b0ee3861bf320d1b9",
+      "timestamp": "2026-07-24T17:23:05.000Z",
+      "hashRecheckedAfterCalls": true
+    },
+    "humanReadableRecord": "../benchmarks/results/LIVE_CHAIN_WITNESS.md",
+    "extendedHumanReadableRecord": "../benchmarks/results/LIVE_CHAIN_WITNESS_EXTENDED_V2.md",
+    "reproducer": "../benchmarks/live_chain_witness.mjs",
+    "rawProviderResponsesIncluded": false,
+    "availabilityNote": "The repository contains the witness method and historical summaries, not raw provider responses or reconstructed deployed model/runtime bytes."
+  },
+  "scope": {
+    "modelBytes": "intentionally public",
+    "rpcBoundary": "Historical eth_call results are provider-attested observations rather than transaction receipts or consensus proofs.",
+    "compatibility": "This manifest records the deployed system used by the live UI. Repository changes do not imply that these contracts were redeployed."
+  },
+  "providerAttestedReferenceState": {
+    "blockNumber": 13342043,
+    "blockHash": "0xffd825db1bb2534052a604db9584d361111d8bc9e19d753b0ee3861bf320d1b9",
+    "activeModels": 12,
+    "reconstructedCoreBytes": 31185324,
+    "contentCommitmentsMatched": 12,
+    "extendedPredictionsMatched": 108
+  },
+  "compatibility": {
+    "contractUpgradeRequired": false,
+    "modelMigrationRequired": false,
+    "clientChangesIncluded": true,
+    "note": "This patch changes client validation and training parity only. It does not claim that arbitrary future registry entries are contract-enforced content commitments."
+  }
+}

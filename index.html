@@ -30,11 +30,29 @@ SOFTWARE.
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 
-  <meta name="description" content="GenesisL1 Forest is a decentralized AI model studio and marketplace." />
-  <meta name="keywords" content="GenesisL1, Decentralized AI, Model NFTs, GBDT" />
+  <meta name="description" content="GL1F is an open system for reconstructible integer gradient-boosted trees with specified local and EVM inference on GenesisL1." />
+  <meta name="keywords" content="GL1F, GenesisL1, deterministic machine learning, gradient-boosted trees, EVM inference, reproducible computing, DeSci" />
+  <meta name="author" content="Mikhail Fedorov" />
+  <meta name="version" content="0.2.3" />
+  <meta name="release-date" content="2026-09-05" />
+  <meta name="robots" content="index,follow" />
   <meta name="theme-color" content="#f8fafc" />
-  <title>GenesisL1 Forest — Decentralized AI Studio</title>
+
+  <meta property="og:title" content="GL1F — Reconstructible Machine Learning on GenesisL1" />
+  <meta property="og:description" content="Train, publish, reconstruct, and evaluate canonical integer tree ensembles across browser, Python, C++, and the EVM." />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="GenesisL1 Forest" />
+  <meta property="og:url" content="https://gl1f.com/" />
+  <meta property="og:image" content="https://genesisl1.com/logo.svg" />
+
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="GL1F — Reconstructible Machine Learning on GenesisL1" />
+  <meta name="twitter:description" content="A canonical public model format with deterministic local and EVM inference." />
+  <meta name="twitter:image" content="https://genesisl1.com/logo.svg" />
+
+  <title>GL1F — Reconstructible Machine Learning on GenesisL1</title>
   
+  <link rel="canonical" href="https://gl1f.com/" />
   <link rel="icon" href="data:," />
   <link rel="stylesheet" href="./style.css" />
 
@@ -71,7 +89,7 @@ SOFTWARE.
     }
 
     .kicker-pill {
-      display: none;
+      display: inline-flex;
       align-items: center;
       gap: 8px;
       padding: 6px 16px;
@@ -112,7 +130,9 @@ SOFTWARE.
     }
   </style>
 </head>
-<body class="page-home"> <div class="container">
+<body class="page-home">
+  <a class="skip-link" href="#main">Skip to main content</a>
+  <div class="container">
     <div class="topbar">
       <div class="brand">
         <a class="brand" href="./index.html" style="text-decoration:none;">
@@ -120,52 +140,53 @@ SOFTWARE.
       </div>
       <button class="btn navToggle" type="button" aria-label="Menu" aria-controls="siteNav" aria-expanded="false"><span class="navToggleIcon" aria-hidden="true"></span></button>
       <nav class="nav" id="siteNav" aria-label="Primary navigation">
-        <a class="btn ghost small" href="./forest.html">Ai Models</a>
-        <a class="btn ghost small" href="./aistore.html">Ai Store</a>
+        <a class="btn ghost small" href="./forest.html">Models</a>
+        <a class="btn ghost small" href="./aistore.html">Marketplace</a>
         <a class="btn ghost small" href="./my.html">My models</a>
+        <a class="btn ghost small" href="./research.html">Research</a>
         <a class="btn ghost small" href="./terms.html">Terms</a>
-        <a class="btn primary small" href="./create.html" style="margin-left: 8px;">Create Model</a>
+        <a class="btn primary small" href="./create.html" style="margin-left: 8px;">Launch Studio</a>
       </nav>
     </div>
 
+    <main id="main">
     <div class="hero-wrapper" id="top">
       <canvas id="treesFx" class="hero-canvas"></canvas>
 
       <div class="hero-content">
         <div class="kicker-pill">
           <span style="width:8px;height:8px;background:#0f62fe;border-radius:50%;"></span>
-          GenesisL1 machine learning laboratory
+          Live on GenesisL1 · chain ID 29
         </div>
         
         <h1>
-          AI on blockchain <br />
-          <span style="color: #0f62fe; -webkit-text-fill-color: #0f62fe;">Decentralized Inteligence</span>
+          Deterministic inference.<br />
+          <span style="color: #0f62fe; -webkit-text-fill-color: #0f62fe;">Public, reconstructible models.</span>
         </h1>
         
         <p class="muted" style="font-size: 1.25rem; max-width: 680px; margin: 24px auto 32px auto;">
-          Craft machine learning models in the browser without coding and tokenize them as NFT assets for inference on the GenesisL1 blockchain.
-          
+          Train integer gradient-boosted trees, publish their canonical bytes,
+          and evaluate the same integer traversal through JavaScript, Python, C++,
+          or the deployed EVM runtime.
         </p>
 
         <div class="row" style="justify-content: center; gap: 16px;">
-          <a class="btn primary" href="./create.html">Start Building</a>
-          <a class="btn" href="./forest.html">Browse Models</a>
+          <a class="btn primary" href="./create.html">Build a model</a>
+          <a class="btn" href="./research.html">Read the research</a>
         </div>
 
         <div class="stat-row">
           <div class="stat-item">
-            <span class="stat-val">100%</span>
-            <span class="stat-lbl">On-Chain</span>
+            <span class="stat-val">12 / 12</span>
+            <span class="stat-lbl">Pinned artifacts reconstructed</span>
           </div>
           <div class="stat-item">
-            <span class="stat-val">0s</span>
-            <span class="stat-lbl">Server Setup</span>
+            <span class="stat-val">31.19 MB</span>
+            <span class="stat-lbl">Bytes reconstructed</span>
           </div>
           <div class="stat-item">
-            <span class="stat-val">MIT</span>
-            <a href="https://github.com/GenesisL1/Forest" target="_blank" rel="noopener noreferrer">
-  	    <span class="stat-lbl">Open Source</span>
-            </a>
+            <span class="stat-val">4</span>
+            <span class="stat-lbl">Execution surfaces</span>
           </div>
         </div>
       </div>
@@ -176,61 +197,62 @@ SOFTWARE.
     <div style="margin: 80px 0;">
       <div class="row spread" style="margin-bottom: 40px; align-items: flex-end;">
         <div>
-          <h2 style="margin-bottom: 8px;">Built for Deterministic AI</h2>
+          <h2 style="margin-bottom: 8px;">From model artifact to documented computation</h2>
           <p class="muted" style="margin: 0; max-width: 500px;">
-            A complete ecosystem to create, verify, and monetize structured machine learning models without centralized gatekeepers.
+            A documented binary format, integer traversal semantics, deployed
+            contracts, and public verification tools in one open stack.
           </p>
         </div>
-        <a href="GL1F.pdf" class="btn">View Documentation</a>
+        <a href="./FORMAT_SPEC.md" class="btn">Format specification</a>
       </div>
 
       <div class="cards">
         <div class="card">
-          <div class="icon-box">⚡</div>
-          <h3>In-Browser Training</h3>
+          <div class="icon-box" aria-hidden="true">GF</div>
+          <h3>Canonical model format</h3>
           <p class="muted">
-            Train powerfull GBDT (Gradient Boosted Decision Trees) directly in your browser. No Python environments or servers required.
+            GL1F v1 and v2 encode fixed-depth scalar or vector ensembles in an explicit, strictly validated byte layout.
           </p>
         </div>
 
         <div class="card">
-          <div class="icon-box">💎</div>
-          <h3>Model NFTs</h3>
+          <div class="icon-box" aria-hidden="true">Q</div>
+          <h3>Integer inference</h3>
           <p class="muted">
-            Mint your trained logic as an NFT on GenesisL1. The metadata and weights are verifiable and ownable.
+            Quantized thresholds and leaves eliminate floating-point arithmetic from EVM traversal and support exact integer comparison.
           </p>
         </div>
 
         <div class="card">
-          <div class="icon-box">🛒</div>
-          <h3>DeSci Marketplace</h3>
+          <div class="icon-box" aria-hidden="true">29</div>
+          <h3>Deployed infrastructure</h3>
           <p class="muted">
-            List your models in the Forest Ai Store or create any access plans and charge L1 coin inference fees. 
+            Storage, registry, model-token, runtime, and marketplace contracts are already deployed on GenesisL1 and used by this UI.
           </p>
         </div>
 
         <div class="card">
-          <div class="icon-box">🌐</div>
-          <h3>Verifiable Inference</h3>
+          <div class="icon-box" aria-hidden="true">ID</div>
+          <h3>Reconstructible artifacts</h3>
           <p class="muted">
-            Run read-call inference on-chain or via gateways. Logic is transparent, enabling trustless research and operational decisions.
+            Public GL1C chunks can be reconstructed, strictly decoded, commitment-checked, and evaluated without relying on this website.
           </p>
         </div>
-    <div class="card">
-          <div class="icon-box">🔐</div>
-          <h3>Cryptographic API</h3>
+
+        <div class="card">
+          <div class="icon-box" aria-hidden="true">API</div>
+          <h3>Multiple access paths</h3>
           <p class="muted">
-            Models may be accessed free or paid: per per inference with transaction and receipt, or pay per access plan.
+            Use unrestricted reads, signed owner or access reads, or metered transactions. These paths govern calls, not byte confidentiality.
           </p>
         </div>
         
-         <div class="card">
-          <div class="icon-box">🔬</div>
-          <h3>Research-grade accuracy</h3>
-<p class="muted">
-  Transparent, deterministic inference designed for reproducible science and verifiable on-chain computation.
-</p>
-
+        <div class="card">
+          <div class="icon-box" aria-hidden="true">✓</div>
+          <h3>Evidence by construction</h3>
+          <p class="muted">
+            Formal arguments, cross-runtime fixtures, local-EVM tests, benchmarks, and a number-pinned chain witness define the supported claims.
+          </p>
         </div>
 
       </div>
@@ -241,38 +263,46 @@ SOFTWARE.
       
       <div class="grid2" style="position:relative; z-index:2; gap:60px;">
         <div>
-          <h2 style="color:white; font-size: 2.5rem;">Why Gradient Boosting?</h2>
+          <h2 style="color:white; font-size: 2.5rem;">A public computational instrument</h2>
           <p style="color: #94a3b8; font-size: 1.1rem; line-height: 1.7; margin-bottom: 32px;">
-            While LLMs grab headlines, structured data runs the world. GBDT is the gold standard for tabular data: fast, interpretable, and compact enough to live on-chain.
+            GL1F makes a model's executable representation available for public
+            inspection and local evaluation. The pinned-chain record reports
+            which bytes and state were observed under provider-attested
+            assumptions; scientific validity remains a separate,
+            domain-specific burden.
           </p>
           
           <div style="display:flex; flex-direction:column; gap: 16px;">
             <div class="row">
               <span style="color: #4ade80;">✓</span>
-              <span style="color: #e2e8f0;">General Scientific Models &amp; Data Discovery</span>
+              <span style="color: #e2e8f0;">Model cores are intentionally public and reconstructible</span>
             </div>
             <div class="row">
               <span style="color: #4ade80;">✓</span>
-              <span style="color: #e2e8f0;">Biotech, Bioinformatics & Biomedical ML</span>
+              <span style="color: #e2e8f0;">Specified local and EVM integer semantics are testable under stated premises</span>
             </div>
             <div class="row">
               <span style="color: #4ade80;">✓</span>
-              <span style="color: #e2e8f0;">Crypto, DeFi & Fintech Prediction Models</span>
+              <span style="color: #e2e8f0;">Number-pinned <code>eth_call</code> observations are reported with explicit RPC and state limitations</span>
             </div>
           </div>
         </div>
 
         <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 32px;">
-          <h3 style="color:white; margin-top:0;">Start creating</h3>
-          <p style="color: #94a3b8; font-size: 0.95rem;">Upload a CSV, select your target column, and watch the Forest grow.</p>
-          <a href="./create.html" class="btn primary" style="width: 100%; margin-top: 12px; background:#0f62fe;">Launch Studio</a>
+          <h3 style="color:white; margin-top:0;">Inspect the complete record</h3>
+          <p style="color: #94a3b8; font-size: 0.95rem;">
+            Read the v0.2.3 paper, formal supplement, deployment documentation,
+            and reproducibility commands.
+          </p>
+          <a href="./research.html" class="btn primary" style="width: 100%; margin-top: 12px; background:#0f62fe;">Open Research</a>
         </div>
       </div>
     </div>
+    </main>
 
-    <div style="text-align: center; margin-top: 80px; color: var(--text-muted); font-size: 0.9rem;">
-      <p>© 2026 Decentralized Science Labs • GenesisL1 Blockchain  • L1coin</p>
-    </div>
+    <footer style="text-align: center; margin-top: 80px; color: var(--text-muted); font-size: 0.9rem;">
+      <p>© 2026 Decentralized Science Labs · Technical report v0.2.3 · 5 September 2026 · <a href="./LICENSE">Software: MIT</a> · <a href="./research.html">Research</a> · <a href="https://github.com/GenesisL1/Forest" target="_blank" rel="noopener noreferrer">Source</a></p>
+    </footer>
   </div>
 
   <script>

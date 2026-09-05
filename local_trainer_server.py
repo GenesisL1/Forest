@@ -21,6 +21,12 @@ Notes:
 - The server code itself is stdlib-only. Training is executed by spawning `train_gl1f.py`
   as a subprocess (which may use numpy).
 - Dataset caching: upload once, get a datasetId, then reuse that id for all training rounds.
+- Open the UI through this server (normally http://127.0.0.1:8787). The API rejects
+  cross-origin browser requests and unapproved Host names. The process refuses to bind
+  beyond loopback because this local bridge has no remote-user authentication layer.
+- Static serving is restricted to the browser UI and explicitly public research links;
+  repository internals, dotfiles, source tooling, and local credentials are not served.
+- Upload, JSON-request, and trainer-output sizes are bounded and configurable by CLI.
 """
 
 from __future__ import annotations
@@ -28,26 +34,28 @@ from __future__ import annotations
 import argparse
 import base64
 import csv
+import ipaddress
 import io
 import json
 import os
 import secrets
-import shutil
 import signal
 import struct
 import subprocess
 import sys
 import threading
 import time
-import traceback
 import urllib.parse
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, Dict, Optional, Tuple
 
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
+DEFAULT_MAX_UPLOAD_BYTES = 256 * 1024 * 1024
+DEFAULT_MAX_JSON_BYTES = 1024 * 1024
+DEFAULT_MAX_MODEL_BYTES = 256 * 1024 * 1024
 
 
 # ----------------------------
@@ -59,10 +67,30 @@ _DATASETS: Dict[str, Dict[str, Any]] = {}  # datasetId -> {path, filename, sizeB
 
 _ACTIVE_PROC_LOCK = threading.Lock()
 _ACTIVE_PROC: Optional[subprocess.Popen] = None
+_TRAIN_SLOT_LOCK = threading.Lock()
+
+
+class RequestBodyError(ValueError):
+    """The declared HTTP request body could not be read completely."""
+
+    def __init__(self, message: str, status: int = HTTPStatus.BAD_REQUEST):
+        super().__init__(message)
+        self.status = int(status)
 
 
 def _now_iso() -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+
+def _is_loopback_bind_host(host: str) -> bool:
+    value = str(host).strip().lower().strip("[]")
+    if value == "localhost":
+        return True
+    try:
+        address = ipaddress.ip_address(value)
+        return address.version == 4 and address.is_loopback
+    except ValueError:
+        return False
 
 
 def _safe_filename(name: str) -> str:
@@ -79,19 +107,58 @@ def _json_bytes(obj: Any) -> bytes:
     return json.dumps(obj, ensure_ascii=False).encode("utf-8")
 
 
-def _read_body_stream(rfile, length: int, out_path: Path, chunk_size: int = 1024 * 1024) -> int:
-    out_path.parent.mkdir(parents=True, exist_ok=True)
+def _read_body_stream(
+    rfile,
+    length: int,
+    out_path: Path,
+    chunk_size: int = 1024 * 1024,
+) -> int:
+    """Write exactly ``length`` bytes to a new file or leave no file behind."""
+    if length < 0:
+        raise RequestBodyError("negative request body length")
+
     written = 0
-    with out_path.open("wb") as f:
-        remaining = length
-        while remaining > 0:
-            chunk = rfile.read(min(chunk_size, remaining))
-            if not chunk:
-                break
-            f.write(chunk)
-            written += len(chunk)
-            remaining -= len(chunk)
-    return written
+    try:
+        # The caller supplies a random path in a private cache directory.  "xb"
+        # prevents a local symlink/pre-creation race from redirecting the write.
+        with out_path.open("xb") as f:
+            remaining = length
+            while remaining > 0:
+                chunk = rfile.read(min(chunk_size, remaining))
+                if not chunk:
+                    raise RequestBodyError(
+                        f"incomplete request body ({written} of {length} bytes)"
+                    )
+                f.write(chunk)
+                written += len(chunk)
+                remaining -= len(chunk)
+            f.flush()
+            os.fsync(f.fileno())
+        return written
+    except Exception:
+        try:
+            out_path.unlink()
+        except FileNotFoundError:
+            pass
+        raise
+
+
+def _private_cache_subdir(cache_dir: Path, name: str) -> Path:
+    """Return an owner-private, non-symlink cache subdirectory."""
+    root = cache_dir.resolve(strict=True)
+    candidate = root / name
+    candidate.mkdir(mode=0o700, parents=False, exist_ok=True)
+    resolved = candidate.resolve(strict=True)
+    if resolved.parent != root:
+        raise RuntimeError(f"unsafe cache subdirectory: {candidate}")
+    if not resolved.is_dir():
+        raise RuntimeError(f"cache path is not a directory: {resolved}")
+    try:
+        resolved.chmod(0o700)
+    except OSError:
+        # Some platforms/filesystems do not implement POSIX permissions.
+        pass
+    return resolved
 
 
 
@@ -226,13 +293,20 @@ def _kill_process_tree(proc: subprocess.Popen) -> None:
     try:
         if proc.poll() is not None:
             return
-        # Try gentle terminate first.
-        proc.terminate()
+        # The trainer starts in its own POSIX session, so terminate any helper
+        # process it may have spawned as well as the direct child.
+        if os.name == "posix":
+            os.killpg(proc.pid, signal.SIGTERM)
+        else:
+            proc.terminate()
         for _ in range(20):
             if proc.poll() is not None:
                 return
             time.sleep(0.1)
-        proc.kill()
+        if os.name == "posix":
+            os.killpg(proc.pid, signal.SIGKILL)
+        else:
+            proc.kill()
     except Exception:
         pass
 
@@ -407,16 +481,18 @@ def _train_subprocess(
         if desc:
             argv += ["--description", str(desc)]
 
-    proc = subprocess.Popen(
-        argv,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        cwd=str(train_script.parent),
-        text=True,
-    )
-
     global _ACTIVE_PROC
     with _ACTIVE_PROC_LOCK:
+        if _ACTIVE_PROC is not None and _ACTIVE_PROC.poll() is None:
+            raise RuntimeError("Training already running")
+        proc = subprocess.Popen(
+            argv,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            cwd=str(train_script.parent),
+            text=True,
+            start_new_session=(os.name == "posix"),
+        )
         _ACTIVE_PROC = proc
     try:
         out, err = proc.communicate()
@@ -430,48 +506,250 @@ class Handler(SimpleHTTPRequestHandler):
     # `directory` is provided via functools.partial in main()
 
     server_version = f"local_trainer_server/{VERSION}"
+    _PUBLIC_ROOT_FILES = frozenset(
+        {
+            "GL1F.pdf",
+            "CITATION.cff",
+            "FORMAT_SPEC.md",
+            "LICENSE",
+            "REPRODUCIBILITY.md",
+            "aistore.html",
+            "create.html",
+            "forest.html",
+            "index.html",
+            "model.html",
+            "my.html",
+            "research.html",
+            "style.css",
+            "terms.html",
+        }
+    )
+    _PUBLIC_NESTED_FILES = frozenset(
+        {
+            "benchmarks/live_chain_witness.mjs",
+            "benchmarks/results/LIVE_CHAIN_WITNESS.md",
+            "benchmarks/results/LIVE_CHAIN_WITNESS_EXTENDED_V2.md",
+            "deployments/genesisl1.json",
+            "docs/ARCHITECTURE.md",
+            "docs/DEPLOYED_SYSTEM.md",
+            "docs/ON_CHAIN_API.md",
+            "paper/GL1F_Formal_Supplement.pdf",
+        }
+    )
 
-    def _set_cors(self) -> None:
-        # Allow cross-origin usage if the UI is served from a different origin.
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+    @classmethod
+    def _public_relative_path(cls, relative: PurePosixPath) -> bool:
+        value = relative.as_posix()
+        if len(relative.parts) == 1 and value in cls._PUBLIC_ROOT_FILES:
+            return True
+        if value in cls._PUBLIC_NESTED_FILES:
+            return True
+        return (
+            len(relative.parts) == 2
+            and relative.parts[0] == "src"
+            and relative.suffix == ".js"
+        )
+
+    def _static_request_allowed(self, url_path: str) -> bool:
+        try:
+            decoded = urllib.parse.unquote(url_path, errors="strict")
+        except UnicodeDecodeError:
+            return False
+        if "\0" in decoded or "\\" in decoded or decoded.startswith("//"):
+            return False
+        relative = PurePosixPath(decoded.lstrip("/"))
+        parts = relative.parts
+        if any(part in ("", ".", "..") or part.startswith(".") for part in parts):
+            return False
+
+        base = Path(self.directory).resolve(strict=True)
+        if not parts:
+            return (base / "index.html").is_file()
+        if not self._public_relative_path(relative):
+            return False
+
+        candidate = (base / Path(*parts)).resolve(strict=False)
+        try:
+            resolved_relative = PurePosixPath(candidate.relative_to(base).as_posix())
+        except ValueError:
+            return False
+        # Apply the allowlist again after symlink resolution so an allowed name
+        # cannot be used as an alias for a private source or credential file.
+        return self._public_relative_path(resolved_relative)
 
     def _send_json(self, obj: Any, status: int = 200) -> None:
         data = _json_bytes(obj)
         self.send_response(status)
-        self._set_cors()
         self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
         self.wfile.write(data)
 
+    def _request_length(self, *, maximum: int, required: bool = True) -> int:
+        if self.headers.get("Transfer-Encoding"):
+            raise RequestBodyError(
+                "Transfer-Encoding is not supported",
+                HTTPStatus.BAD_REQUEST,
+            )
+        values = self.headers.get_all("Content-Length", failobj=[])
+        if len(values) != 1:
+            if not values and not required:
+                return 0
+            raise RequestBodyError(
+                "Exactly one Content-Length header is required",
+                HTTPStatus.LENGTH_REQUIRED,
+            )
+        value = values[0].strip()
+        if not value.isdecimal():
+            raise RequestBodyError("Invalid Content-Length")
+        length = int(value)
+        if length > maximum:
+            raise RequestBodyError(
+                f"Request body exceeds the {maximum}-byte limit",
+                HTTPStatus.REQUEST_ENTITY_TOO_LARGE,
+            )
+        return length
+
     def _read_json_body(self) -> dict:
-        length = int(self.headers.get("Content-Length") or 0)
+        content_type = self.headers.get_content_type()
+        if content_type != "application/json":
+            raise RequestBodyError(
+                "Content-Type must be application/json",
+                HTTPStatus.UNSUPPORTED_MEDIA_TYPE,
+            )
+        maximum = int(getattr(self.server, "max_json_bytes", DEFAULT_MAX_JSON_BYTES))
+        length = self._request_length(maximum=maximum)
         raw = self.rfile.read(length) if length > 0 else b""
+        if len(raw) != length:
+            raise RequestBodyError(
+                f"Incomplete request body ({len(raw)} of {length} bytes)"
+            )
         if not raw:
             return {}
         try:
-            return json.loads(raw.decode("utf-8"))
-        except Exception:
-            raise ValueError("Invalid JSON request body")
+            value = json.loads(raw.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise RequestBodyError("Invalid JSON request body") from exc
+        if not isinstance(value, dict):
+            raise RequestBodyError("JSON request body must be an object")
+        return value
+
+    def _host_allowed(self) -> bool:
+        host_values = self.headers.get_all("Host", failobj=[])
+        if len(host_values) != 1:
+            return False
+        raw_host = host_values[0].strip()
+        if not raw_host or "@" in raw_host:
+            return False
+        try:
+            parsed = urllib.parse.urlsplit(f"//{raw_host}")
+            hostname = (parsed.hostname or "").lower()
+            port = parsed.port
+        except ValueError:
+            return False
+        expected_port = int(self.server.server_address[1])
+        effective_port = port if port is not None else 80
+        if effective_port != expected_port:
+            return False
+        allowed = {
+            str(value).lower()
+            for value in getattr(
+                self.server,
+                "allowed_api_hosts",
+                ("127.0.0.1", "localhost", "::1"),
+            )
+        }
+        return hostname in allowed
+
+    def _same_origin(self, value: str) -> bool:
+        raw_host = (self.headers.get("Host") or "").strip()
+        try:
+            actual = urllib.parse.urlsplit(value)
+            expected = urllib.parse.urlsplit(f"http://{raw_host}")
+            actual_port = actual.port or 80
+            expected_port = expected.port or 80
+        except ValueError:
+            return False
+        return (
+            actual.scheme.lower() == "http"
+            and actual.username is None
+            and actual.password is None
+            and (actual.hostname or "").lower() == (expected.hostname or "").lower()
+            and actual_port == expected_port
+        )
+
+    def _guard_api_request(self, *, mutating: bool) -> bool:
+        if not self._host_allowed():
+            self._send_json(
+                {"ok": False, "error": "Host is not allowed for the local API"},
+                status=HTTPStatus.FORBIDDEN,
+            )
+            return False
+        if not mutating:
+            return True
+
+        fetch_site = (self.headers.get("Sec-Fetch-Site") or "").lower()
+        if fetch_site in ("cross-site", "none"):
+            self._send_json(
+                {"ok": False, "error": "Cross-origin API requests are not allowed"},
+                status=HTTPStatus.FORBIDDEN,
+            )
+            return False
+
+        origin = self.headers.get("Origin")
+        if origin is not None and not self._same_origin(origin):
+            self._send_json(
+                {"ok": False, "error": "Cross-origin API requests are not allowed"},
+                status=HTTPStatus.FORBIDDEN,
+            )
+            return False
+
+        referer = self.headers.get("Referer")
+        if origin is None and referer is not None and not self._same_origin(referer):
+            self._send_json(
+                {"ok": False, "error": "Cross-origin API requests are not allowed"},
+                status=HTTPStatus.FORBIDDEN,
+            )
+            return False
+        return True
 
     def do_OPTIONS(self):
-        self.send_response(HTTPStatus.NO_CONTENT)
-        self._set_cors()
-        self.end_headers()
+        self._send_json(
+            {"ok": False, "error": "Cross-origin API requests are not allowed"},
+            status=HTTPStatus.METHOD_NOT_ALLOWED,
+        )
 
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
         if parsed.path == "/api/ping":
+            if not self._guard_api_request(mutating=False):
+                return
             cpp_bin = getattr(self.server, "cpp_train_bin", None)
             supports_cpp = bool(cpp_bin) and os.path.exists(cpp_bin)
             self._send_json({"ok": True, "version": VERSION, "time": _now_iso(), "supportsCpp": supports_cpp})
             return
+        if not self._static_request_allowed(parsed.path):
+            self.send_error(HTTPStatus.NOT_FOUND)
+            return
         return super().do_GET()
+
+    def do_HEAD(self):
+        parsed = urllib.parse.urlparse(self.path)
+        if not self._static_request_allowed(parsed.path):
+            self.send_error(HTTPStatus.NOT_FOUND)
+            return
+        return super().do_HEAD()
+
+    def list_directory(self, path):
+        self.send_error(HTTPStatus.NOT_FOUND)
+        return None
 
     def do_POST(self):
         parsed = urllib.parse.urlparse(self.path)
+        if not self._guard_api_request(mutating=True):
+            return
         if parsed.path == "/api/upload":
             return self._handle_upload(parsed)
         if parsed.path == "/api/train":
@@ -481,24 +759,38 @@ class Handler(SimpleHTTPRequestHandler):
         self._send_json({"ok": False, "error": f"Unknown endpoint: {parsed.path}"}, status=404)
 
     def _handle_upload(self, parsed_url: urllib.parse.ParseResult):
+        tmp_path: Optional[Path] = None
         try:
+            if self.headers.get_content_type() != "application/octet-stream":
+                raise RequestBodyError(
+                    "Content-Type must be application/octet-stream",
+                    HTTPStatus.UNSUPPORTED_MEDIA_TYPE,
+                )
             qs = urllib.parse.parse_qs(parsed_url.query or "")
             filename = _safe_filename((qs.get("filename") or ["dataset.csv"])[0])
 
-            length = int(self.headers.get("Content-Length") or 0)
+            maximum = int(
+                getattr(self.server, "max_upload_bytes", DEFAULT_MAX_UPLOAD_BYTES)
+            )
+            length = self._request_length(maximum=maximum)
             if length <= 0:
                 self._send_json({"ok": False, "error": "Missing Content-Length"}, status=400)
                 return
 
             dataset_id = secrets.token_hex(16)
-            ext = os.path.splitext(filename)[1] or ".csv"
+            ext = Path(filename).suffix.lower()
+            if ext not in (".csv", ".tsv", ".txt"):
+                ext = ".csv"
             cache_dir = Path(self.server.cache_dir)  # type: ignore[attr-defined]
-            ds_path = cache_dir / "datasets" / f"{dataset_id}{ext}"
-            tmp_path = cache_dir / "datasets" / f".tmp_{dataset_id}{ext}"
+            datasets_dir = _private_cache_subdir(cache_dir, "datasets")
+            ds_path = datasets_dir / f"{dataset_id}{ext}"
+            tmp_path = datasets_dir / f".tmp_{dataset_id}_{secrets.token_hex(8)}"
 
-            # Stream request body to disk.
+            # Publish only a fully received file.  The exclusive temporary
+            # creation and same-directory replace make publication atomic.
             written = _read_body_stream(self.rfile, length, tmp_path)
-            tmp_path.replace(ds_path)
+            os.replace(tmp_path, ds_path)
+            tmp_path = None
 
             columns = _csv_columns_from_file(ds_path) or []
 
@@ -520,10 +812,23 @@ class Handler(SimpleHTTPRequestHandler):
                 "sizeBytes": int(written),
                 "columns": columns,
             })
+        except RequestBodyError as e:
+            self._send_json({"ok": False, "error": str(e)}, status=e.status)
         except Exception as e:
             self._send_json({"ok": False, "error": str(e)}, status=500)
+        finally:
+            if tmp_path is not None:
+                try:
+                    tmp_path.unlink()
+                except FileNotFoundError:
+                    pass
 
     def _handle_stop(self):
+        try:
+            self._request_length(maximum=0, required=False)
+        except RequestBodyError as e:
+            self._send_json({"ok": False, "error": str(e)}, status=e.status)
+            return
         stopped = False
         with _ACTIVE_PROC_LOCK:
             proc = _ACTIVE_PROC
@@ -533,6 +838,18 @@ class Handler(SimpleHTTPRequestHandler):
         self._send_json({"ok": True, "stopped": stopped})
 
     def _handle_train(self):
+        if not _TRAIN_SLOT_LOCK.acquire(blocking=False):
+            self._send_json(
+                {"ok": False, "error": "Training already running"},
+                status=HTTPStatus.CONFLICT,
+            )
+            return
+        try:
+            self._handle_train_reserved()
+        finally:
+            _TRAIN_SLOT_LOCK.release()
+
+    def _handle_train_reserved(self):
         try:
             req = self._read_json_body()
             dataset_id = str(req.get("datasetId") or "")
@@ -549,15 +866,23 @@ class Handler(SimpleHTTPRequestHandler):
             train_script = Path(self.server.train_script)  # type: ignore[attr-defined]
             python_exe = str(self.server.python_exe)  # type: ignore[attr-defined]
             cache_dir = Path(self.server.cache_dir)  # type: ignore[attr-defined]
-            runs_dir = cache_dir / "runs"
-            runs_dir.mkdir(parents=True, exist_ok=True)
-            out_path = runs_dir / f"{dataset_id}_{int(time.time())}_{secrets.token_hex(4)}.gl1f"
+            datasets_dir = _private_cache_subdir(cache_dir, "datasets")
+            dataset_path = Path(ds["path"]).resolve(strict=True)
+            if dataset_path.parent != datasets_dir or not dataset_path.is_file():
+                self._send_json(
+                    {"ok": False, "error": "Cached dataset path is invalid"},
+                    status=HTTPStatus.CONFLICT,
+                )
+                return
+            if dataset_path.stat().st_size != int(ds["sizeBytes"]):
+                self._send_json(
+                    {"ok": False, "error": "Cached dataset size has changed"},
+                    status=HTTPStatus.CONFLICT,
+                )
+                return
 
-            # Ensure only one training proc at a time (simpler UX).
-            with _ACTIVE_PROC_LOCK:
-                if _ACTIVE_PROC is not None and _ACTIVE_PROC.poll() is None:
-                    self._send_json({"ok": False, "error": "Training already running"}, status=409)
-                    return
+            runs_dir = _private_cache_subdir(cache_dir, "runs")
+            out_path = runs_dir / f"{dataset_id}_{int(time.time())}_{secrets.token_hex(4)}.gl1f"
 
             engine = str(req.get("engine") or "python").strip().lower()
             if engine not in ("python", "cpp"):
@@ -576,7 +901,7 @@ class Handler(SimpleHTTPRequestHandler):
                 engine=engine,
                 train_script=train_script,
                 train_bin=cpp_train_bin,
-                dataset_path=Path(ds["path"]),
+                dataset_path=dataset_path,
                 out_path=out_path,
                 req=req,
                 python_exe=python_exe,
@@ -590,6 +915,27 @@ class Handler(SimpleHTTPRequestHandler):
                 self._send_json({"ok": False, "error": f"trainer exited with code {code}: {msg}"}, status=500)
                 return
 
+            if not out_path.is_file():
+                self._send_json(
+                    {"ok": False, "error": "trainer produced no model file"},
+                    status=HTTPStatus.INTERNAL_SERVER_ERROR,
+                )
+                return
+            max_model_bytes = int(
+                getattr(self.server, "max_model_bytes", DEFAULT_MAX_MODEL_BYTES)
+            )
+            model_size = out_path.stat().st_size
+            if model_size > max_model_bytes:
+                self._send_json(
+                    {
+                        "ok": False,
+                        "error": (
+                            f"trainer output exceeds the {max_model_bytes}-byte limit"
+                        ),
+                    },
+                    status=HTTPStatus.REQUEST_ENTITY_TOO_LARGE,
+                )
+                return
             gl1f_bytes = out_path.read_bytes()
 
             model_bytes, pkg = _parse_gl1x_footer(gl1f_bytes)
@@ -608,6 +954,13 @@ class Handler(SimpleHTTPRequestHandler):
                 "curve": curve,
             }
             self._send_json(resp)
+        except RequestBodyError as e:
+            self._send_json({"ok": False, "error": str(e)}, status=e.status)
+        except FileNotFoundError:
+            self._send_json(
+                {"ok": False, "error": "Cached dataset file is missing"},
+                status=HTTPStatus.CONFLICT,
+            )
         except Exception as e:
             self._send_json({"ok": False, "error": str(e)}, status=500)
 
@@ -621,27 +974,69 @@ def main() -> int:
     ap.add_argument("--train-script", default="train_gl1f.py", help="Path to train_gl1f.py (default: ./train_gl1f.py)")
     ap.add_argument("--cpp-train-bin", default="train_gl1f_cpp", help="Path to C++ trainer binary (default: ./train_gl1f_cpp)")
     ap.add_argument("--python", dest="python_exe", default=sys.executable, help="Python executable to run train_gl1f.py")
+    ap.add_argument(
+        "--max-upload-bytes",
+        type=int,
+        default=DEFAULT_MAX_UPLOAD_BYTES,
+        help=f"Maximum dataset upload size (default: {DEFAULT_MAX_UPLOAD_BYTES})",
+    )
+    ap.add_argument(
+        "--max-json-bytes",
+        type=int,
+        default=DEFAULT_MAX_JSON_BYTES,
+        help=f"Maximum training request size (default: {DEFAULT_MAX_JSON_BYTES})",
+    )
+    ap.add_argument(
+        "--max-model-bytes",
+        type=int,
+        default=DEFAULT_MAX_MODEL_BYTES,
+        help=f"Maximum trainer output size (default: {DEFAULT_MAX_MODEL_BYTES})",
+    )
     args = ap.parse_args()
 
+    if not _is_loopback_bind_host(args.host):
+        ap.error(
+            "--host must be an IPv4 loopback address (for example 127.0.0.1); "
+            "the trainer API is not an authenticated network service"
+        )
+
+    for flag, value in (
+        ("--max-upload-bytes", args.max_upload_bytes),
+        ("--max-json-bytes", args.max_json_bytes),
+        ("--max-model-bytes", args.max_model_bytes),
+    ):
+        if value < 1:
+            ap.error(f"{flag} must be positive")
+
     base_dir = Path(args.dir or Path(__file__).resolve().parent).resolve()
+    if not base_dir.is_dir():
+        ap.error(f"--dir is not a directory: {base_dir}")
     cache_dir = Path(args.cache_dir)
     if not cache_dir.is_absolute():
         # Prefer keeping cache next to the server (project dir) for consistency.
         cache_dir = (base_dir / cache_dir).resolve()
 
     try:
-        cache_dir.mkdir(parents=True, exist_ok=True)
+        cache_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+        try:
+            cache_dir.chmod(0o700)
+        except OSError:
+            pass
     except PermissionError:
         # If the project directory is read-only / owned by root, fall back to a user-writable cache.
         fallback = Path.home() / ".forest_trainer_cache"
-        fallback.mkdir(parents=True, exist_ok=True)
+        fallback.mkdir(mode=0o700, parents=True, exist_ok=True)
+        try:
+            fallback.chmod(0o700)
+        except OSError:
+            pass
         print(f"[warn] Cannot create cache dir: {cache_dir} (permission). Using: {fallback}", file=sys.stderr)
         cache_dir = fallback
 
     train_script = Path(args.train_script)
     if not train_script.is_absolute():
         train_script = (base_dir / train_script).resolve()
-    if not train_script.exists():
+    if not train_script.is_file():
         print(f"[err] train script not found: {train_script}", file=sys.stderr)
         print("      Put train_gl1f.py next to local_trainer_server.py, or pass --train-script.", file=sys.stderr)
         return 2
@@ -651,6 +1046,7 @@ def main() -> int:
     handler_cls = functools.partial(Handler, directory=str(base_dir))
 
     httpd = ThreadingHTTPServer((args.host, args.port), handler_cls)
+    httpd.daemon_threads = True
     httpd.cache_dir = str(cache_dir)      # type: ignore[attr-defined]
     httpd.train_script = str(train_script) # type: ignore[attr-defined]
     httpd.python_exe = str(args.python_exe) # type: ignore[attr-defined]
@@ -658,11 +1054,19 @@ def main() -> int:
     if not cpp_train_bin.is_absolute():
         cpp_train_bin = base_dir / cpp_train_bin
     httpd.cpp_train_bin = str(cpp_train_bin) # type: ignore[attr-defined]
+    httpd.max_upload_bytes = int(args.max_upload_bytes) # type: ignore[attr-defined]
+    httpd.max_json_bytes = int(args.max_json_bytes) # type: ignore[attr-defined]
+    httpd.max_model_bytes = int(args.max_model_bytes) # type: ignore[attr-defined]
+
+    allowed_api_hosts = {"127.0.0.1", "localhost"}
+    allowed_api_hosts.add(str(args.host).strip().lower().strip("[]"))
+    httpd.allowed_api_hosts = tuple(sorted(allowed_api_hosts)) # type: ignore[attr-defined]
 
     print(f"[ok] Serving {base_dir} on http://{args.host}:{args.port}")
     print(f"[ok] Cache dir: {cache_dir}")
     print(f"[ok] Train script: {train_script}")
     print(f"[ok] C++ trainer: {cpp_train_bin} (exists={cpp_train_bin.exists()})")
+    print(f"[ok] API Host allowlist: {', '.join(httpd.allowed_api_hosts)}")
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:

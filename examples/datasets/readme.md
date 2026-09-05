@@ -115,7 +115,7 @@ It is intentionally boring: no notebooks, no config files, no hidden state. One 
 GenesisL1 is an EVM Layer-1 with an integrated GBDT model studio called **GenesisL1 Forest** (GL1F). Trained gradient-boosted trees are minted as ERC-721 **Model NFTs** on GenesisL1 and executed deterministically on-chain via integer-quantized inference. To make on-chain inference meaningful, the training data has to be:
 
 1. **Causally clean.** A leak that wouldn't survive a backtest certainly won't survive a live oracle. Every feature at row `N` uses only data from rows `[0..N]`. Every label at row `N` uses only data from rows `[N+1..N+horizon]`.
-2. **Byte-reproducible.** The same `--ticker --candle --start-date --end-date` arguments must yield the same CSV, so any reviewer can verify the dataset hash referenced in a Model NFT's metadata.
+2. **Byte-reproducible.** The same `--ticker --candle --start-date --end-date` arguments must yield the same CSV, so any reader can verify the dataset hash referenced in a Model NFT's metadata.
 3. **Aligned with the inference geometry.** The triple-barrier label here matches the on-chain prediction primitive — *"will price hit `baseline · (1+move)` before `baseline · (1−retrace)` within `horizon` bars?"* — a single bit, directly consumable by smart contracts.
 
 If you are training models that will not go on-chain, the script is still useful — but the design decisions only fully pay off when the dataset is part of an auditable model artifact.

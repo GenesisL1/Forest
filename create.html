@@ -50,8 +50,12 @@ SOFTWARE.
 <title>GenesisL1 Forest — Create & Mint an AI Model NFT</title>
   <link rel="icon" href="data:," />
   <link rel="stylesheet" href="./style.css" />
-  <script src="https://cdn.jsdelivr.net/npm/ethers@6.12.1/dist/ethers.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.27.0/plotly.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.12.1/dist/ethers.umd.min.js"
+    integrity="sha384-ZE/wK5p9CtYydQ2IWO7H7mb0024vP3kJ1eOG7JD9+UA/0VBGZeYIxtttlh93VoK7"
+    crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.27.0/plotly.min.js"
+    integrity="sha384-Hl48Kq2HifOWdXEjMsKo6qxqvRLTYqIGbvlENBmkHAxZKIGCXv43H6W1jA671Rz"
+    crossorigin="anonymous"></script>
 
   <!-- Feature importance table styles (create page only) -->
   <style>
@@ -217,15 +221,15 @@ SOFTWARE.
        <img src="https://genesisl1.com/logo.svg" alt="GenesisL1" style="width:28px; height:28px;" /> GenesisL1 Forest </a>
       </div>
       <button class="btn navToggle" type="button" aria-label="Menu" aria-controls="siteNav" aria-expanded="false"><span class="navToggleIcon" aria-hidden="true"></span></button>
-      <div class="nav" id="siteNav" aria-label="Primary navigation">
+      <nav class="nav" id="siteNav" aria-label="Primary navigation">
         <a class="btn ghost" data-nav="forest" href="./forest.html">AI Models</a>
         <a class="btn ghost" data-nav="market" href="./aistore.html">AI Store</a>
         <a class="btn ghost" data-nav="create" href="./create.html">Create</a>
         <a class="btn ghost" data-nav="my" href="./my.html">My Models</a>
         <a class="btn ghost" data-nav="terms" href="./terms.html">Terms</a>
-        <span class="pill" id="walletPill">Read-only (RPC)</span>
-        <button class="btn primary" id="connectBtn">Connect Wallet</button>
-      </div>
+        <span class="pill" id="walletPill" role="status" aria-live="polite">Read-only (RPC)</span>
+        <button type="button" class="btn primary" id="connectBtn">Connect Wallet</button>
+      </nav>
     </div>
 
     <div class="hero">
@@ -265,13 +269,13 @@ SOFTWARE.
     <!-- TAB: Dataset -->
     <section class="panel tabPanel active" id="panel-dataset" role="tabpanel" aria-labelledby="tab-dataset" data-tab-panel="dataset">
       <h2>Dataset</h2>
-      <label>Upload CSV</label>
+      <label for="csvFile">Upload CSV</label>
       <input id="csvFile" type="file" accept=".csv,text/csv" />
       <div class="muted">For regression/binary/multiclass, choose one label (target) column. For multilabel, choose multiple label columns. Rows with missing / non-numeric <b>feature</b> values are dropped (and for multilabel, rows with invalid label values are dropped too).</div>
 
       <div class="sep"></div>
 
-      <label>Task</label>
+      <label for="taskSel">Task</label>
       <select id="taskSel">
         <option value="regression" selected>Regression</option>
         <option value="binary_classification">Binary classification</option>
@@ -286,7 +290,7 @@ SOFTWARE.
       <div class="sep"></div>
 
       <div id="singleLabelRow">
-        <label>Label column</label>
+        <label for="labelCol">Label column</label>
         <select id="labelCol"></select>
 
         <div id="classBox" style="display:none; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border-light);">
@@ -294,11 +298,11 @@ SOFTWARE.
           <div class="muted">Auto-detected from the label column. You can override if needed.</div>
 
           <div style="margin-top: 12px;">
-            <label>Negative class (0)</label>
+            <label for="negClassSel">Negative class (0)</label>
             <select id="negClassSel"></select>
           </div>
           <div style="margin-top: 12px;">
-            <label>Positive class (1)</label>
+            <label for="posClassSel">Positive class (1)</label>
             <select id="posClassSel"></select>
           </div>
 
@@ -316,7 +320,7 @@ SOFTWARE.
           </div>
 
           <div style="margin-top: 12px;">
-            <label>Class list</label>
+            <label for="multiClassSel">Class list</label>
             <select id="multiClassSel" multiple size="8" style="width:100%; background: var(--bg-input); border: 1px solid var(--border-light); border-radius: 10px; padding: 10px;"></select>
           </div>
 
@@ -339,7 +343,7 @@ SOFTWARE.
         </div>
 
         <div style="margin-top: 12px;">
-          <label>Label column list</label>
+          <label for="multiLabelSel">Label column list</label>
           <select id="multiLabelSel" multiple size="8" style="width:100%; background: var(--bg-input); border: 1px solid var(--border-light); border-radius: 10px; padding: 10px;"></select>
         </div>
 
@@ -363,7 +367,7 @@ SOFTWARE.
 
         <div class="sep mini"></div>
 
-        <label>Mode</label>
+        <label for="imbMode">Mode</label>
         <select id="imbMode">
           <option value="none" selected>Off</option>
           <option value="auto">Auto (balanced)</option>
@@ -372,11 +376,11 @@ SOFTWARE.
 
         <div class="row wrap" style="gap: 14px; align-items:center; margin-top: 12px;">
           <div style="display:flex; align-items:center; gap:8px;">
-            <span class="muted">Max weight</span>
+            <label for="imbCap" class="muted">Max weight</label>
             <input id="imbCap" type="number" min="1" max="1000" step="1" value="20" style="width: 96px;" />
           </div>
 
-          <label style="text-transform:none; letter-spacing:0; margin:0;">
+          <label for="imbNormalize" style="text-transform:none; letter-spacing:0; margin:0;">
             <div class="checkRow">
               <input id="imbNormalize" type="checkbox" checked />
               <span class="muted">Normalize average weight to 1</span>
@@ -425,7 +429,7 @@ SOFTWARE.
 
         <div class="row wrap" style="gap: 14px; align-items:flex-end;">
           <div style="min-width: 220px;">
-            <label style="margin-top: 0;">View mode</label>
+            <label for="ds3dMode" style="margin-top: 0;">View mode</label>
             <select id="ds3dMode">
               <option value="pca" selected>PCA (3D embedding)</option>
               <option value="scatter3">3-feature scatter</option>
@@ -433,12 +437,12 @@ SOFTWARE.
           </div>
 
           <div style="min-width: 160px;">
-            <label style="margin-top: 0;">Sample size</label>
+            <label for="ds3dSample" style="margin-top: 0;">Sample size</label>
             <input id="ds3dSample" type="number" min="500" max="10000" step="100" value="2000" />
           </div>
 
           <div style="min-width: 220px;">
-            <label style="margin-top: 0;">Color by</label>
+            <label for="ds3dColor" style="margin-top: 0;">Color by</label>
             <select id="ds3dColor"></select>
           </div>
         </div>
@@ -446,15 +450,15 @@ SOFTWARE.
         <div id="ds3dFeatureBox" style="display:none; margin-top: 12px;">
           <div class="row wrap" style="gap: 14px; align-items:flex-end;">
             <div style="min-width: 220px;">
-              <label style="margin-top: 0;">X</label>
+              <label for="ds3dX" style="margin-top: 0;">X</label>
               <select id="ds3dX"></select>
             </div>
             <div style="min-width: 220px;">
-              <label style="margin-top: 0;">Y</label>
+              <label for="ds3dY" style="margin-top: 0;">Y</label>
               <select id="ds3dY"></select>
             </div>
             <div style="min-width: 220px;">
-              <label style="margin-top: 0;">Z</label>
+              <label for="ds3dZ" style="margin-top: 0;">Z</label>
               <select id="ds3dZ"></select>
             </div>
           </div>
@@ -487,32 +491,32 @@ SOFTWARE.
       <h2>Training</h2>
 
       <h3>Core hyperparameters</h3>
-      <label>Boosting rounds (trees)</label>
+      <label for="treesRange">Boosting rounds (trees)</label>
       <input id="treesRange" type="range" min="25" max="600" step="25" value="250" />
-      <input id="treesNum" type="number" min="10" max="5000" step="10" value="250" />
+      <input id="treesNum" type="number" min="10" max="5000" step="10" value="250" aria-label="Boosting rounds numeric value" />
       <div class="muted">More boosting rounds can improve performance but increases on-chain size. For multiclass/multilabel this is <b>trees per class/label</b> (total trees = rounds × K).</div>
 
-      <label style="margin-top: 14px;">Depth</label>
+      <label for="depthRange" style="margin-top: 14px;">Depth</label>
       <input id="depthRange" type="range" min="2" max="8" step="1" value="4" />
-      <input id="depthNum" type="number" min="1" max="12" step="1" value="4" />
+      <input id="depthNum" type="number" min="1" max="12" step="1" value="4" aria-label="Depth numeric value" />
       <div class="muted">Deeper trees fit more complexity but grow exponentially in size.</div>
 
-      <label style="margin-top: 14px;">Learning rate</label>
+      <label for="lrRange" style="margin-top: 14px;">Learning rate</label>
       <input id="lrRange" type="range" min="0.01" max="0.3" step="0.01" value="0.05" />
-      <input id="lrNum" type="number" min="0.001" max="1" step="0.001" value="0.05" />
+      <input id="lrNum" type="number" min="0.001" max="1" step="0.001" value="0.05" aria-label="Learning rate numeric value" />
       <div class="muted">Lower = slower learning but often better generalization.</div>
 
-      <label style="margin-top: 14px;">Min leaf samples</label>
+      <label for="minLeafRange" style="margin-top: 14px;">Min leaf samples</label>
       <input id="minLeafRange" type="range" min="1" max="50" step="1" value="10" />
-      <input id="minLeafNum" type="number" min="1" max="1000" step="1" value="10" />
+      <input id="minLeafNum" type="number" min="1" max="1000" step="1" value="10" aria-label="Minimum leaf samples numeric value" />
       <div class="muted">Higher = smoother model; lower = fits noise more easily.</div>
 
-      <label style="margin-top: 14px;">Split bins</label>
+      <label for="binsRange" style="margin-top: 14px;">Split bins</label>
       <input id="binsRange" type="range" min="8" max="256" step="8" value="32" />
-      <input id="binsNum" type="number" min="8" max="512" step="8" value="32" />
+      <input id="binsNum" type="number" min="8" max="512" step="8" value="32" aria-label="Split bins numeric value" />
       <div class="muted">More bins = more candidate split thresholds (slower training). Does not change on-chain model size.</div>
 
-      <label style="margin-top: 14px;">Binning method</label>
+      <label for="binningMode" style="margin-top: 14px;">Binning method</label>
       <select id="binningMode">
         <option value="linear" selected>Linear (min/max)</option>
         <option value="quantile">Quantile (equal-frequency)</option>
@@ -522,7 +526,7 @@ SOFTWARE.
       <div class="sep"></div>
 
       <h3 style="margin-top: 0;">Learning rate schedule (optional)</h3>
-      <label>Mode</label>
+      <label for="lrSchedMode">Mode</label>
       <select id="lrSchedMode">
         <option value="none">None (constant)</option>
         <option value="plateau">Reduce on plateau (−% after N rounds)</option>
@@ -533,21 +537,21 @@ SOFTWARE.
       </div>
 
       <div id="lrPlateauBox" style="display:none; margin-top: 12px;">
-        <label style="margin-top: 0;">Plateau patience (rounds)</label>
+        <label for="lrPlateauN" style="margin-top: 0;">Plateau patience (rounds)</label>
         <input id="lrPlateauN" type="number" min="1" max="10000" step="1" value="25" />
         <div class="muted">If validation metric does not improve for N rounds, reduce LR.</div>
 
-        <label style="margin-top: 12px;">Reduce LR by (%)</label>
+        <label for="lrPlateauPct" style="margin-top: 12px;">Reduce LR by (%)</label>
         <input id="lrPlateauPct" type="number" min="1" max="90" step="1" value="10" />
         <div class="muted">Example: 10 means LR = LR × 0.9.</div>
 
-        <label style="margin-top: 12px;">Minimum LR</label>
+        <label for="lrPlateauMin" style="margin-top: 12px;">Minimum LR</label>
         <input id="lrPlateauMin" type="number" min="0" max="1" step="0.000001" value="0" />
         <div class="muted">Optional floor to avoid LR becoming too small. Use 0 to disable.</div>
       </div>
 
       <div id="lrPiecewiseBox" style="display:none; margin-top: 12px;">
-        <label style="margin-top: 0;">Schedule</label>
+        <label for="lrScheduleText" style="margin-top: 0;">Schedule</label>
         <textarea id="lrScheduleText" rows="4" style="width:100%;" placeholder="1-100 0.1
 101-200 0.05
 201-250 0.001"></textarea>
@@ -562,30 +566,30 @@ SOFTWARE.
 
       <h3 style="margin-top: 0;">Data split & early stopping</h3>
 
-      <label>Seed</label>
+      <label for="seedNum">Seed</label>
       <input id="seedNum" type="number" value="42" />
       <div class="muted">Controls train/val/test shuffle (based on your split %) and tie-breaking.</div>
 
       <div style="margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border-light);">
-        <label>Dataset split (train / val / test)</label>
+        <label for="trainSplitRange">Dataset split (train / val / test)</label>
         <div class="row wrap" style="gap: 12px; align-items: center;">
           <div style="display:flex; align-items:center; gap:8px;">
-            <input id="trainSplitNum" type="number" min="50" max="90" step="1" value="70" style="width: 92px;" />
+            <input id="trainSplitNum" type="number" min="50" max="90" step="1" value="70" style="width: 92px;" aria-label="Training split percentage" />
             <span class="muted">Train %</span>
           </div>
           <div style="display:flex; align-items:center; gap:8px;">
-            <input id="valSplitNum" type="number" min="5" max="40" step="1" value="20" style="width: 92px;" />
+            <input id="valSplitNum" type="number" min="5" max="40" step="1" value="20" style="width: 92px;" aria-label="Validation split percentage" />
             <span class="muted">Val %</span>
           </div>
           <span class="pill" id="testSplitPill">Test 10%</span>
         </div>
 
         <div style="margin-top: 10px;">
-          <label style="margin-top: 0;">Train %</label>
+          <label for="trainSplitRange" style="margin-top: 0;">Train %</label>
           <input id="trainSplitRange" type="range" min="50" max="90" step="1" value="70" />
         </div>
         <div style="margin-top: 10px;">
-          <label style="margin-top: 0;">Val %</label>
+          <label for="valSplitRange" style="margin-top: 0;">Val %</label>
           <input id="valSplitRange" type="range" min="5" max="40" step="1" value="20" />
         </div>
         <div class="muted" id="splitNote">Default 70/20/10. Test set is never used for training (only evaluation).</div>
@@ -593,22 +597,22 @@ SOFTWARE.
       </div>
 
       <div style="margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border-light);">
-        <label>Early stopping</label>
+        <label for="patienceRange">Early stopping</label>
         <div class="checkRow">
-          <input id="earlyStopOn" type="checkbox" checked />
+          <input id="earlyStopOn" type="checkbox" checked aria-label="Enable early stopping" />
           <span class="muted">Stop when validation metric stops improving (MSE for regression; LogLoss for classification)</span>
         </div>
 
         <label style="margin-top: 12px;">Patience (rounds)</label>
         <input id="patienceRange" type="range" min="10" max="120" step="5" value="25" />
-        <input id="patienceNum" type="number" min="1" max="500" step="1" value="25" />
+        <input id="patienceNum" type="number" min="1" max="500" step="1" value="25" aria-label="Early-stopping patience numeric value" />
         <div class="muted" id="patienceHelp">How many boosting rounds to wait for an improvement in the validation metric before stopping.</div>
       </div>
 
       <div style="margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border-light);">
-        <label>Final refit (optional)</label>
+        <label for="refitOn">Final refit (optional)</label>
         <div class="checkRow">
-          <input id="refitOn" type="checkbox" />
+          <input id="refitOn" type="checkbox" aria-label="Enable final refit on training and validation data" />
           <span class="muted">After model selection, retrain on <b>Train+Val</b> for the chosen number of boosting rounds (keeps on-chain size the same).</span>
         </div>
       </div>
@@ -649,7 +653,7 @@ SOFTWARE.
         </label>
 
         <div style="display:flex; align-items:center; gap:8px;">
-          <span class="muted">Max rounds</span>
+          <label for="heuristicSearchRounds" class="muted">Max rounds</label>
           <input id="heuristicSearchRounds" type="number" min="1" max="1000" step="1" value="10" style="width: 92px;" />
         </div>
 
@@ -676,7 +680,7 @@ SOFTWARE.
       <div class="detailsCard" style="margin-top: 12px;">
         <div class="row wrap spread" style="align-items:center; gap: 12px;">
           <div class="stStack" style="min-width: 220px;">
-            <div class="stK">Training engine</div>
+            <label for="trainEngineSel" class="stK">Training engine</label>
             <div class="row wrap" style="gap: 10px; align-items:center;">
               <select id="trainEngineSel" style="min-width: 220px;">
                 <option value="browser">Browser (WebWorker)</option>
@@ -690,7 +694,7 @@ SOFTWARE.
           </div>
 
           <div class="stStack" style="min-width: 320px; flex: 1;">
-            <div class="stK">Python API (localhost)</div>
+            <label for="pythonApiUrl" class="stK">Python API (localhost)</label>
             <div class="row wrap" style="gap: 10px; align-items:center;">
               <input id="pythonApiUrl" value="http://127.0.0.1:8787" placeholder="http://127.0.0.1:8787" />
               <span class="pill" id="pyDatasetPill">Dataset: not cached</span>
@@ -705,12 +709,16 @@ SOFTWARE.
 
 <div class="row wrap spread">
         <span class="pill" id="trainPill">Idle</span>
+        <span class="srOnly" id="trainStatusAnnouncer" role="status"
+              aria-live="polite" aria-atomic="true"></span>
         <div class="row wrap" style="gap: 12px;">
-          <button class="btn primary" id="trainBtn">Train</button>
-          <button class="btn" id="stopBtn">Stop</button>
+          <button type="button" class="btn primary" id="trainBtn">Train</button>
+          <button type="button" class="btn" id="stopBtn">Stop</button>
         </div>
       </div>
-      <div class="progress"><div id="trainBar"></div></div>
+      <div class="progress" id="trainProgress" role="progressbar"
+           aria-label="Training progress" aria-valuemin="0" aria-valuemax="100"
+           aria-valuenow="0"><div id="trainBar"></div></div>
 
       <div class="tabActions">
         <button class="btn" type="button" data-tab-jump="dataset">← Back: Dataset</button>
@@ -729,13 +737,13 @@ SOFTWARE.
       <h3 style="margin-top: 0;">Model file (.gl1f)</h3>
       <div class="muted">Save a portable model package (bytes + metadata) or load a previously exported .gl1f.</div>
       <div class="row wrap" style="gap: 12px; align-items:center; margin-top: 12px;">
-        <button class="btn small" id="exportGl1fBtn" disabled>Export .gl1f</button>
+        <button type="button" class="btn small" id="exportGl1fBtn" disabled>Export .gl1f</button>
         <label class="btn small" style="position: relative; overflow: hidden;">
           Load .gl1f
           <input id="importGl1fFile" type="file" accept=".gl1f,application/octet-stream"
                 style="position:absolute; inset:0; opacity:0; cursor:pointer;" />
         </label>
-        <span class="pill" id="gl1fPill">Model file: none</span>
+        <span class="pill" id="gl1fPill" role="status" aria-live="polite">Model file: none</span>
       </div>
       <div class="muted" style="margin-top: 10px;">
         Export includes model bytes + feature labels + task, plus curve/params (if available) and the current Mint tab
@@ -769,19 +777,19 @@ SOFTWARE.
 
       <div class="row wrap spread" style="margin-top: 14px; align-items: flex-end;">
         <div style="flex:1; min-width: 240px;">
-          <label>Dataset row index (optional)</label>
+          <label for="rowIndex">Dataset row index (optional)</label>
           <input id="rowIndex" type="number" min="0" step="1" placeholder="e.g. 0" />
           <div class="muted">Load a dataset row into inputs, then predict and compare vs the real label.</div>
         </div>
         <div class="row wrap" style="gap: 12px; margin-left: auto;">
-          <button class="btn small" id="loadRowBtn" disabled>Load row</button>
-          <button class="btn small" id="compareRowBtn" disabled>Predict & compare</button>
+          <button type="button" class="btn small" id="loadRowBtn" disabled>Load row</button>
+          <button type="button" class="btn small" id="compareRowBtn" disabled>Predict & compare</button>
         </div>
       </div>
 
       <div id="previewFeatGrid" class="featGrid" style="margin-top: 14px;"></div>
       <div class="row" style="margin-top: 16px;">
-        <button class="btn primary" id="previewBtn" disabled>Predict locally</button>
+        <button type="button" class="btn primary" id="previewBtn" disabled>Predict locally</button>
       </div>
       <div class="sep"></div>
       <div class="kv" id="previewKV"></div>
@@ -797,13 +805,13 @@ SOFTWARE.
       <h2>Mint Model NFT</h2>
 
       <h3>Metadata (required)</h3>
-      <label>Model name</label>
+      <label for="metaName">Model name</label>
       <input id="metaName" placeholder="e.g. NHANES Age Predictor" />
 
-      <label style="margin-top: 12px;">Short description</label>
+      <label for="metaDesc" style="margin-top: 12px;">Short description</label>
       <textarea id="metaDesc" rows="4" placeholder="What does it predict? What dataset? Which features?"></textarea>
 
-      <label style="margin-top: 12px;">128×128 PNG icon</label>
+      <label for="iconFile" style="margin-top: 12px;">128×128 PNG icon</label>
       <input id="iconFile" type="file" accept="image/png" />
       <div class="muted">Stored fully on-chain inside the NFT. Must be exactly 128×128 px.</div>
 
@@ -817,11 +825,11 @@ SOFTWARE.
 
       <div class="row wrap" style="align-items:flex-end; margin-top: 12px;">
         <div style="flex:1; min-width: 240px;">
-          <label>Key address</label>
+          <label for="ownerKeyAddr">Key address</label>
           <input id="ownerKeyAddr" placeholder="0x…" readonly />
         </div>
         <div style="flex:1; min-width: 240px;">
-          <label>Private key (save it)</label>
+          <label for="ownerKeyPriv">Private key (save it)</label>
           <input id="ownerKeyPriv" type="password" placeholder="0x…" />
         </div>
         <button id="genOwnerKeyBtn" class="btn small" type="button">Generate</button>
@@ -830,7 +838,7 @@ SOFTWARE.
       </div>
 
       <div class="checkRow" style="margin-top: 10px;">
-        <input id="ownerKeySaved" type="checkbox" />
+        <input id="ownerKeySaved" type="checkbox" aria-label="Confirm the owner private key was saved" />
         <div>
           <div><b>I saved this private key</b></div>
           <div class="muted">Needed for the read-only API key inference system.</div>
@@ -840,18 +848,18 @@ SOFTWARE.
       <div class="sep"></div>
 
       <h3>Inference pricing (owner-controlled)</h3>
-      <label>Mode</label>
+      <label for="pricingMode">Mode</label>
       <select id="pricingMode">
         <option value="0">Free</option>
         <option value="1">Tips (optional)</option>
         <option value="2">Paid required</option>
       </select>
 
-      <label style="margin-top: 12px;">Fee (L1)</label>
+      <label for="pricingFee" style="margin-top: 12px;">Fee (L1)</label>
       <input id="pricingFee" type="number" step="0.001" value="0.001" />
       <div class="muted">UI clamps 0.001–1 L1 for sanity (you can change later as owner).</div>
 
-      <label style="margin-top: 12px;">Fee recipient (optional)</label>
+      <label for="pricingRecipient" style="margin-top: 12px;">Fee recipient (optional)</label>
       <input id="pricingRecipient" placeholder="0x… (defaults to you)" />
 
       <div class="sep"></div>
@@ -886,12 +894,12 @@ SOFTWARE.
       </div>
 
       <div class="row wrap spread" style="margin-top: 14px;">
-        <span class="pill" id="deployPill">Need: connect wallet, train model, generate+save owner key, name + description, 128×128 icon, accept Terms + License</span>
-        <button class="btn primary" id="deployBtn" disabled>Deploy Model NFT</button>
+        <span class="pill" id="deployPill" role="status" aria-live="polite" aria-atomic="true">Need: connect wallet, train model, generate+save owner key, name + description, 128×128 icon, accept Terms + License</span>
+        <button type="button" class="btn primary" id="deployBtn" disabled>Deploy Model NFT</button>
       </div>
 
       <div class="sep"></div>
-      <pre class="log" id="deployLog" style="height: 260px;"></pre>
+      <pre class="log" id="deployLog" style="height: 260px;" role="log" aria-live="polite" aria-label="Deployment log"></pre>
 
       <div class="tabActions">
         <button class="btn" type="button" data-tab-jump="preview">← Back: Local preview</button>

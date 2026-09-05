@@ -9,6 +9,6 @@ if errorlevel 1 (
   exit /b 1
 )
 
-g++ -O3 -std=c++17 -o train_gl1f_cpp.exe cpp\train_gl1f_cpp.cpp
+g++ -O3 -std=c++17 -ffp-contract=off -fno-fast-math -o train_gl1f_cpp.exe cpp\train_gl1f_cpp.cpp
 
 echo Built: %cd%\train_gl1f_cpp.exe

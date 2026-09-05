@@ -11,7 +11,11 @@ if ! command -v g++ >/dev/null 2>&1; then
   exit 1
 fi
 
-g++ -O3 -std=c++17 -o train_gl1f_cpp cpp/train_gl1f_cpp.cpp
+# Cross-engine byte identity assumes that the compiler preserves the written
+# floating-point operation order. Keep contraction and fast-math
+# reassociation disabled explicitly rather than relying on compiler defaults.
+g++ -O3 -std=c++17 -ffp-contract=off -fno-fast-math \
+  -o train_gl1f_cpp cpp/train_gl1f_cpp.cpp
 chmod +x train_gl1f_cpp
 
 echo "Built: $(pwd)/train_gl1f_cpp"

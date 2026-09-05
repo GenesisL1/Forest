@@ -1,0 +1,428 @@
+\ifdefined\pdfinfoomitdate\pdfinfoomitdate=1\fi
+\ifdefined\pdftrailerid\pdftrailerid{}\fi
+\documentclass[10pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs,longtable,tabularx,array}
+\usepackage{enumitem}
+\usepackage[most]{tcolorbox}
+\usepackage{xcolor}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{hyperref}
+\usepackage{xurl}
+\usepackage[a4paper,margin=21mm,headheight=20pt]{geometry}
+
+\definecolor{GLNavy}{HTML}{0B1F3A}
+\definecolor{GLBlue}{HTML}{175CD3}
+\definecolor{GLTeal}{HTML}{0F766E}
+\definecolor{GLPale}{HTML}{EFF6FF}
+\definecolor{GLGreen}{HTML}{166534}
+\definecolor{GLInk}{HTML}{172033}
+\definecolor{GLMuted}{HTML}{516070}
+\definecolor{GLLine}{HTML}{CBD5E1}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=GLBlue,
+  citecolor=GLTeal,
+  urlcolor=GLBlue,
+  pdftitle={GL1F Formal and Reproducibility Supplement},
+  pdfauthor={Mikhail Fedorov},
+  pdfsubject={Public technical-report supplement v0.2.3 (not peer reviewed): formal definitions, proofs, executable witnesses, and assurance boundaries},
+  pdfkeywords={GL1F, formal proof, GBDT, EVM, reproducibility, fixed point}
+}
+\urlstyle{same}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{5pt plus 1pt minus 1pt}
+\setlist{leftmargin=6mm,itemsep=2pt,topsep=3pt}
+\renewcommand{\familydefault}{\sfdefault}
+\renewcommand{\ttdefault}{lmtt}
+\color{GLInk}
+
+\titleformat{\section}{\Large\bfseries\color{GLNavy}}{\thesection}{0.7em}{}
+  [\vspace{-2pt}\color{GLLine}\titlerule]
+\titleformat{\subsection}{\large\bfseries\color{GLNavy}}{\thesubsection}{0.7em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries\color{GLTeal}}{\thesubsubsection}{0.7em}{}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\color{GLMuted}\textbf{GL1F} · formal supplement}
+\fancyhead[R]{\small\color{GLMuted}Mikhail Fedorov · 2026}
+\fancyfoot[L]{\scriptsize\color{GLMuted}Proofs, witnesses, and reproducibility profile}
+\fancyfoot[R]{\small\color{GLMuted}\thepage}
+\renewcommand{\headrulewidth}{0.3pt}
+
+\newtheorem{definition}{Definition}[section]
+\newtheorem{lemma}[definition]{Lemma}
+\newtheorem{theorem}[definition]{Theorem}
+\newtheorem{proposition}[definition]{Proposition}
+\newtheorem{corollary}[definition]{Corollary}
+\theoremstyle{remark}
+\newtheorem{remark}[definition]{Remark}
+
+\newtcolorbox{resultbox}[1][]{
+  enhanced,
+  colback=GLPale,
+  colframe=GLBlue,
+  boxrule=0.6pt,
+  arc=2mm,
+  title={#1},
+  fonttitle=\bfseries,
+  left=4mm,right=4mm,top=3mm,bottom=3mm
+}
+
+\begin{document}
+
+\thispagestyle{empty}
+\begin{tcolorbox}[
+  enhanced,colback=GLNavy,colframe=GLNavy,arc=0mm,boxrule=0pt,
+  left=8mm,right=8mm,top=11mm,bottom=11mm
+]
+{\color{white}
+\small\bfseries PUBLIC TECHNICAL REPORT V0.2.3 · FORMAL DEFINITIONS · PROOFS
+
+\vspace{8mm}
+{\fontsize{28}{32}\selectfont\bfseries
+GL1F Formal and\\
+Reproducibility Supplement\par}
+
+\vspace{6mm}
+{\large Canonical bytes, bounded traversal, exact cross-runtime inference,
+fixed-point error bounds, code-as-data reconstruction, and deployment
+evidence.\par}
+
+\vspace{9mm}
+{\large\bfseries Mikhail Fedorov}\\[-1mm]
+Version dated 5 September 2026 · not peer reviewed
+}
+\end{tcolorbox}
+
+\vspace{5mm}
+\begin{resultbox}[Evidence summary]
+\begin{tabularx}{\linewidth}{>{\bfseries}l X}
+Cross-engine suite & 18/18 test methods; 25 distinct three-engine training profiles plus one standalone arithmetic witness\\
+Formal boundary witnesses & 8/8 executable properties\\
+Local EVM integration & v1/v2 boundary parity plus 72/72 scalar scaling comparisons\\
+Provider-attested deployment summary & 12/12 hashes and nine named relations; 108/108 local/provider-returned read-call outputs matched\\
+Reported reconstructed model data & 31,185,324 bytes across up to 397 exact GL1C chunks per model\\
+Canonical Solidity build & solc 0.8.20, viaIR, optimizer 200, Istanbul target\\
+\end{tabularx}
+\end{resultbox}
+
+\vfill
+\small\color{GLMuted}
+\textbf{Controlling distinction.} A proof of execution equivalence says which
+integer result follows from fixed bytes and inputs. It does not prove the
+scientific truth, predictive utility, safety, authorship, or causal meaning of
+the model.
+
+\textbf{Evidence boundary.} Raw provider responses and reconstructed deployed
+model/runtime bytes are not included. The live-state values are therefore
+provider-attested historical summaries; the included source supports a fresh
+RPC-assisted observation and local reproduction of the remaining evidence.
+
+\newpage
+\tableofcontents
+\newpage
+
+\section{Purpose and assurance model}
+
+GL1F makes a deliberately narrow model family unusually easy to inspect. A
+complete fixed-depth tree is serialized as fixed-width integers. The EVM
+runtime performs no floating-point arithmetic and no data-dependent recursion:
+it reads a feature index and threshold, applies one strict comparison, updates
+a heap index, reads one leaf, and accumulates an integer. The same core is
+consumed by browser, native, and contract evaluators.
+
+The supplement establishes five different claims, each with its own evidence:
+
+\begin{enumerate}
+  \item \textbf{Representation:} exact byte geometry follows from the complete
+        tree layout.
+  \item \textbf{Traversal:} a depth-$d$ tree reaches exactly one valid leaf
+        after exactly $d$ decisions.
+  \item \textbf{Reconstruction:} a well-formed GL1C manifest returns the exact
+        serialized primitives, including chunk-boundary reads.
+  \item \textbf{Equivalence:} identical externally verified canonical bytes
+        and packed int32 input produce the same integer scalar or vector under
+        conforming local and EVM evaluator specifications. Source inspection
+        and finite tests separately support the tested contract path.
+  \item \textbf{Approximation:} abstract exact-real fixed-point error is
+        bounded when saturation and path changes are excluded; the production
+        binary64 correction and a split-margin condition make that boundary
+        explicit.
+\end{enumerate}
+
+Training parity is not promoted to a universal theorem. The trainers use
+floating-point split scores, metrics, exponentials/logarithms, and seeded
+random choices. Their equality is therefore supported by an explicit
+publication profile and executable cross-engine tests.
+
+\section{Evidence map}
+
+\begin{longtable}{p{13mm}p{25mm}p{105mm}}
+\toprule
+Class & Meaning & Interpretation\\
+\midrule
+\endfirsthead
+\toprule
+Class & Meaning & Interpretation\\
+\midrule
+\endhead
+P & Proved & Derived from definitions and stated preconditions.\\
+T & Tested & Reproduced by an executable test or benchmark on the recorded environment.\\
+C & Chain-observed & Read at a pinned block; state and RPC evidence are explicitly scoped.\\
+S & Source fact & Directly implemented or declared in the tested repository.\\
+L & Literature & Supported by primary specifications or peer-reviewed literature.\\
+U & Unsupported & Overbroad, contradicted, or not demonstrated; not presented as established.\\
+\bottomrule
+\end{longtable}
+
+\begin{resultbox}[Scoped system statement]
+GL1F is an integrated, proof-friendly, fixed-depth integer GBDT format and
+tool chain spanning browser, Python, and C++ training; exact local inference;
+fixed EVM runtime-code publication at a pinned state; and direct scalar or
+vector contract execution. Under the publication profile, the tested trainers
+emitted byte-identical cores; for canonical bytes and identical packed input,
+exact equality between conforming evaluator specifications is proved. Source,
+test, and chain evidence separately support the tested implementation.
+\end{resultbox}
+
+\input{formal_results.tex}
+
+\section{Executable evidence}
+
+\subsection{Three-engine training parity}
+
+The publication suite invokes the production browser worker under Node,
+compiles the production C++ trainer, invokes the Python CLI, and compares the
+core GL1F bytes. It covers regression, binary, multiclass, and multilabel
+objectives; linear and quantile binning; weighting; stratification; early
+stopping; fixed-budget refitting; learning-rate schedules; seed zero;
+repeatability; v1/v2 inference; rounding boundaries; packaging; and hostile
+stream rejection.
+
+The suite identified a real operation-order discrepancy. The browser computed
+linear histogram bins by multiplying by a cached reciprocal, while Python and
+C++ divided by the range before multiplication. The algebra is real-number
+equivalent but not IEEE-754 equivalent at every bin boundary. Replacing the
+reciprocal multiplication with the same divide-then-multiply order restored
+all tested three-engine byte comparisons.
+
+An additional generated boundary case then exposed a second finite witness. For a
+generated 4,000-row, 12-feature, four-class profile, Python accumulated the
+softmax denominator from binary32-rounded exponentials while JavaScript and
+C++ accumulated binary64 exponentials. One byte in the 22,120-byte Python
+core differed, corresponding to a one-Q-unit leaf change. The corrected
+profile uses binary64 exponentials, an ascending-class-index binary64
+denominator sum, a binary32 numerator, binary64 division, and a binary32
+result. All three engines now emit
+\nolinkurl{58e3d9e63c5dd1313872e0c5a07c229b071272f1137f393a0384601329a432eb}
+for that witness. This is a maintained regression result, not a universal
+claim about every platform or mathematical library.
+
+\subsection{Reference performance observation}
+
+\begin{table}[h]
+\centering
+\caption{Recorded end-to-end trainer median (IQR width) in seconds; 30 timed
+repetitions per engine and task after one warm-up.}
+\label{tab:supp-trainer}
+\begin{tabular}{lrrr}
+\toprule
+Workload & Python median & C++ median & JavaScript/Node median\\
+\midrule
+Regression & 0.2770 (0.0149) & 0.0336 (0.0010) & 0.1222 (0.0060)\\
+Binary classification & 0.2812 (0.0155) & 0.0406 (0.0011) & 0.1403 (0.0112)\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Each run used 3,000 rows, 12 features, 60 depth-4 trees, and 30 measured
+repetitions per engine and task after one warm-up. Startup, parsing, training,
+serialization, and output writing are included. All three engines produced
+identical 11,064-byte cores. Ratios of the observed Python and C++ medians were
+8.24 and 6.93; they are workload-specific measurements, not universal speed
+claims.
+
+\subsection{Isolated EVM integration}
+
+The local integration test compiles the unmodified contracts with the pinned
+profile, deploys ModelStore, ModelRegistry, ModelNFT, and ForestRuntime to an
+isolated Ganache chain, stores minimal canonical v1 and v2 models through
+17-byte GL1C chunks and pointer tables, reconstructs the code, verifies both
+model commitments, and compares independent bigint reference inference with
+scalar, vector, and class EVM results on six equality/extreme boundary
+vectors.
+
+\begin{table}[h]
+\centering
+\caption{Isolated local-EVM correctness-fixture measurements.}
+\label{tab:supp-evm-correctness}
+\begin{tabular}{lrr}
+\toprule
+Measurement & v1 scalar & v2 vector/class\\
+\midrule
+Core bytes / chunks & 104 / 7 & 156 / 10\\
+Mean view gas estimate & 77,600 & 109,011 vector; 108,412 class\\
+Transaction inference gas & 79,573 & 115,527\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Equal vector logits deterministically select class zero, matching the
+specified lowest-index tie rule.
+
+\subsection{Local-EVM scalar scaling}
+
+A complementary benchmark publishes six deterministic two-feature v1 shapes
+through 20,000-byte chunks and applies the same 12 seeded vectors to each
+shape. All 72 reference/runtime profile-vector comparisons matched.
+
+\begin{table}[h]
+\centering
+\caption{Local scalar scaling observations. Means are rounded to the nearest
+gas unit; raw observations and unrounded statistics are archived.}
+\label{tab:supp-evm-scaling}
+\begin{tabular}{rrrrr}
+\toprule
+Trees & Depth & Core bytes & Tree-body reads & Mean gas\\
+\midrule
+20  & 3 & 1,784  & 140   & 286,247\\
+50  & 3 & 4,424  & 350   & 644,454\\
+50  & 4 & 9,224  & 450   & 810,777\\
+100 & 4 & 18,424 & 900   & 1,576,945\\
+200 & 4 & 36,824 & 1,800 & 3,121,210\\
+50  & 6 & 38,024 & 650   & 1,146,414\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+For the tested scalar decoder, tree-body model-code reads---feature and
+threshold reads at each internal node and one leaf read per tree---equal
+\(R_{\mathrm{tree}}=T(2d+1)\). This excludes registry, core-header, and
+pointer-resolution accesses. A descriptive ordinary least-squares summary of
+the six unrounded means was approximately
+\[
+\widehat{\mathrm{gas}}\approx42{,}900+1{,}708.3R_{\mathrm{tree}},
+\]
+with \(R^2\approx0.99998\) and maximum absolute relative residual 1.45\%.
+This is a six-point description under one recorded Solidity
+0.8.20/Ganache 7.9.2 profile, not a gas theorem, mined-transaction result, or
+live-network fee forecast.
+
+\section{Pinned deployment witness}
+
+At GenesisL1 block 13,342,043, recorded hash
+\nolinkurl{0xffd825db1bb2534052a604db9584d361111d8bc9e19d753b0ee3861bf320d1b9},
+the strict witness reconstructed all 31,185,324 bytes of 12 active models.
+Every exact pointer-table/chunk shape passed, every recomputed
+\texttt{keccak256(core)} matched its model identifier, every strict header
+passed each applicable registry/header and storage check, and every local
+zero-vector integer output matched the deployed EVM read-call output.  The
+block hash was re-read after all witness calls and remained unchanged.
+
+\begin{longtable}{r p{53mm} r r r r r}
+\toprule
+\# & Model & Ver. & $F$ & $d$ & Trees & Bytes / chunks\\
+\midrule
+\endfirsthead
+\toprule
+\# & Model & Ver. & $F$ & $d$ & Trees & Bytes / chunks\\
+\midrule
+\endhead
+1 & Iris model & 2 & 4 & 3 & 1,800 & 158,436 / 7\\
+2 & Raisin classification & 1 & 7 & 5 & 169 & 63,568 / 3\\
+3 & Boston housing prices & 1 & 13 & 6 & 196 & 148,984 / 7\\
+4 & PV efficiency, 57° North & 1 & 4 & 3 & 275 & 24,224 / 2\\
+5 & Bitcoin 24 h volatility & 1 & 53 & 5 & 20 & 7,544 / 1\\
+6 & ETH +2\% in 5 h & 1 & 26 & 8 & 1,496 & 4,583,768 / 191\\
+7 & ETH $-2$\% in 5 h & 1 & 27 & 8 & 2,500 & 7,660,024 / 320\\
+8 & XRP +2\% in 5 h & 1 & 33 & 8 & 1,008 & 3,088,536 / 129\\
+9 & XRP $-2$\% in 5 h & 1 & 33 & 9 & 1,552 & 9,523,096 / 397\\
+10 & ZEC +4\% in 5 h & 1 & 33 & 7 & 1,789 & 2,733,616 / 114\\
+11 & ZEC $-4$\% in 5 h & 1 & 33 & 8 & 1,042 & 3,192,712 / 134\\
+12 & ZEC $\pm4$\% volatility gate & 1 & 47 & 3 & 9 & 816 / 1\\
+\bottomrule
+\end{longtable}
+
+The recorded witness summary is byte/execution evidence, not predictive
+validation. Its raw provider responses are not included, so the live-state
+values are not independently reproducible from this repository alone. An
+\texttt{eth\_call} is not a transaction receipt or consensus proof, and two
+creator addresses do not prove two independent people or organizations.
+
+\section{Open-protocol and registry boundary}
+
+GL1F is an open protocol whose model bytes are intentionally public. Paid mode
+may meter the canonical transaction/read endpoint, event trail, or integrated
+service; it is not model encryption and does not prevent independent local
+evaluation.
+
+The deployed registry records a caller-supplied model identifier and manifest
+without recomputing the entire core on-chain. This does not invalidate the
+canonical publisher or the 12 live records—the strict witness confirms all 12.
+It means that arbitrary future entries require the same independent verifier
+unless a later registry enforces the binding. The consequence is a
+registration-integrity and availability boundary.
+
+\section{Scientific limits and falsifiability}
+
+The format, tests, proofs, NFT, and chain witness do not establish:
+
+\begin{itemize}
+  \item predictive accuracy, calibration, external validity, or causal truth;
+  \item absence of leakage, sampling bias, data drift, or subgroup harm;
+  \item authorship, legal intellectual-property ownership, or licence
+        enforceability;
+  \item secrecy of model bytes, feature vectors, or outputs;
+  \item correctness of an RPC response without the stated node/state
+        assumptions; or
+  \item suitability for clinical, financial, or other high-stakes use.
+\end{itemize}
+
+Application-level claims require dataset provenance, a prespecified evaluation
+protocol, baselines, ablations, uncertainty estimates, calibration, and
+domain-specific ethical and safety analysis. These materials are outside the
+scope of this systems report.
+
+\section{Reproduction commands}
+
+\begin{verbatim}
+npm ci
+python3 -m unittest -v tests.publication.test_publication
+python3 -m unittest -v tests.contracts_publication.test_formal_properties
+npm run test:contracts
+npm run test:evm
+npm run benchmark:evm
+python3 tests/ui_static_check.py
+python3 benchmarks/publication_benchmark.py \
+  --out benchmarks/results/publication_benchmark.json
+\end{verbatim}
+
+The public reproduction set contains the local evidence and the read-only
+live-witness method. It does not contain the raw provider responses required
+for an offline reproduction of the historical live-state summary.
+
+See \mbox{\texttt{REPRODUCIBILITY.md}} for the exact environment, commands,
+checked-in records, and evidence boundary. The
+language-neutral binary grammar and publication profile appear in
+\path{FORMAT_SPEC.md}.
+
+\section{Conclusion}
+
+GL1F's scientific leverage comes from reducing the semantic gap between model
+artifact and execution. The tree grammar is fixed-width enough to count, the
+integer semantics are simple enough to prove, the three training surfaces are
+close enough to test at the byte level, and the published code is open enough
+to reconstruct independently. The resulting model is not an oracle of truth;
+it is a public computational instrument whose exact behavior can be inspected,
+challenged, and deterministically reevaluated under explicit premises.
+
+\end{document}

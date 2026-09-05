@@ -1,0 +1,113 @@
+{
+  "schema": "gl1f-local-evm-integration/v1",
+  "status": "PASS",
+  "command": "node tests/contracts_publication/test_evm_integration.mjs --out benchmarks/results/evm_integration.json",
+  "scope": "Deterministic isolated Ganache conformance evidence; not a public-chain observation.",
+  "sourceDigests": {
+    ".nvmrc": "7e8a2fa94951112b894a3dbe3d05efef5e9263741fa49125f0a70f40fedab4cc",
+    "contracts/ForestRuntime.sol": "72bfe83900ad7d74023a40945ec7bfe7ab123dbe274583acccd539886978a222",
+    "contracts/ModelNFT.sol": "b190e8a4f363bc3050ab9d3d35f41c43b63bccef9670e6c51415713b7cbf9ff3",
+    "contracts/ModelRegistry.sol": "bc1b5e02e28a98af780efc0f8331816e4acc995f0b0c209b1eebb90d35be0812",
+    "contracts/ModelStore.sol": "0172f17dc9c3d549867f5fe02ff0e43ad09da37f5144120863c6e1ab9e003d61",
+    "contracts/SimpleOwnable.sol": "03a4ea9b113a9d14ca8e4380ce017f0cc20c9b7b8962861fbbc7301355f83394",
+    "package-lock.json": "499eea40ccb1e607875aee52e9c9f95fa65c5011eedd4a3796c23f1e9939eb38",
+    "src/local_infer.js": "364040894c362bb3ff524006efa3c513e417db6523cc77c77e18a82ed82c74a2",
+    "tests/contracts_publication/test_evm_integration.mjs": "62bbe8702aedc8e02d62390c0a809fbbbc13ee85f370788dace2365f5d5d8c05"
+  },
+  "software": {
+    "node": "v24.19.0",
+    "ethers": "6.15.0",
+    "ganache": "7.9.2"
+  },
+  "compiler": {
+    "version": "0.8.20+commit.a1b79de6.Emscripten.clang",
+    "viaIR": true,
+    "optimizerRuns": 200,
+    "evmVersion": "istanbul",
+    "runtimeBytes": {
+      "ForestRuntime": 17794,
+      "ModelStore": 714,
+      "ModelRegistry": 12725,
+      "ModelNFT": 5968
+    }
+  },
+  "chain": {
+    "engine": "ganache 7.9.2",
+    "chainId": 1337,
+    "hardfork": "shanghai"
+  },
+  "deploymentGas": {
+    "ModelStore": "207748",
+    "ModelRegistry": "3094952",
+    "ModelNFT": "1404427",
+    "setModelNFT": "47810",
+    "ForestRuntime": "3897154"
+  },
+  "models": {
+    "v1": {
+      "modelId": "0xeb0ee33a46399a8592b6676035a7e580c1f90e7761a2eb1f4a56d0f9f0e4ab18",
+      "bytes": 104,
+      "chunks": 7,
+      "chunkSize": 17,
+      "tokenId": "1",
+      "chunkWriteGas": {
+        "min": "57129",
+        "max": "60257",
+        "mean": "59779"
+      },
+      "tableWriteGas": "104093",
+      "registrationGas": "737905",
+      "predictViewEstimatedGas": {
+        "min": "76195",
+        "max": "81033",
+        "mean": "77600"
+      },
+      "predictTxGas": "79573"
+    },
+    "v2": {
+      "modelId": "0x9945db61c0a69faa9be5c4ee46ba3a32d0f9a0bb13daf385753a122f4d39acdc",
+      "bytes": 156,
+      "chunks": 10,
+      "chunkSize": 17,
+      "tokenId": "2",
+      "chunkWriteGas": {
+        "min": "57329",
+        "max": "60245",
+        "mean": "59929"
+      },
+      "tableWriteGas": "124460",
+      "registrationGas": "734138",
+      "predictMultiViewEstimatedGas": {
+        "min": "108169",
+        "max": "111849",
+        "mean": "109011"
+      },
+      "predictClassViewEstimatedGas": {
+        "min": "107584",
+        "max": "111303",
+        "mean": "108412"
+      },
+      "predictMultiTxGas": "115527"
+    }
+  },
+  "assuranceBoundaryWitness": {
+    "registryAcceptedMismatchedModelId": true,
+    "registeredModelId": "0x60c713e19362bcb16b04fb6fc611821a8a3fb90e1698490bf4819c2c44838875",
+    "reconstructedModelId": "0xeb0ee33a46399a8592b6676035a7e580c1f90e7761a2eb1f4a56d0f9f0e4ab18",
+    "tokenId": "3",
+    "predictViewReachedReferencedBytes": true,
+    "strictLoaderRejectedMismatchedModelId": true,
+    "predictionQ": "1043"
+  },
+  "directByteChecks": {
+    "chunkPayloadEqualsInputSlices": true,
+    "reconstructedCoreEqualsInputCore": true,
+    "reconstructedDigestEqualsModelId": true
+  },
+  "comparisons": {
+    "boundaryVectors": 6,
+    "viewResults": 18,
+    "transactionResults": 2,
+    "mismatches": 0
+  }
+}

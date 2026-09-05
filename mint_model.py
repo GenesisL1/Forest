@@ -64,10 +64,10 @@ Inputs (CLI flags):
 Outputs:
   - mint_state.json   resumable per-chunk state + pointer addresses
   - owner_key.txt     freshly-generated owner API keypair (SAVE THIS)
-  - S1.json           Supplementary Table S1 values for the paper
+  - S1.json           machine-readable deployment record
 
 Dependencies:
-  pip install web3 eth-account python-dotenv pillow
+  python -m pip install -r requirements-mint.txt
 """
 
 from __future__ import annotations
@@ -75,13 +75,30 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import os
 import struct
 import sys
 import time
-from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Optional
+
+from gl1f_validate import (
+    FormatError,
+    parse_gl1f_package,
+    validate_deployed_registry_profile,
+)
+from mint_workflow import (
+    OwnerKeyError,
+    WorkflowStateError,
+    acquire_owner_key,
+    bind_owner_key,
+    empty_mint_state,
+    load_mint_state,
+    obtain_registration_receipt,
+    safe_rpc_endpoint_identity,
+    save_json_artifact_exclusive,
+    save_mint_state,
+    validate_resume_chain_state,
+)
 
 try:
     from web3 import Web3
@@ -93,7 +110,7 @@ try:
     from PIL import Image
 except ImportError as e:
     print(f"\n[fatal] Missing dependency: {e}\n", file=sys.stderr)
-    print("Install with:\n  pip install web3 eth-account python-dotenv pillow\n",
+    print("Install with:\n  python -m pip install -r requirements-mint.txt\n",
           file=sys.stderr)
     sys.exit(1)
 
@@ -115,11 +132,6 @@ DEFAULTS = {
 
 # CHUNK_SIZE = 24000 (src/create_page.js line 38). ModelStore enforces ≤ 24572.
 CHUNK_SIZE = 24000
-
-# Magic bytes
-GL1F_MAGIC = b"GL1F"   # model magic
-GL1C_MAGIC = b"GL1C"   # chunk runtime prefix
-GL1X_MAGIC = b"GL1X"   # optional JSON footer
 
 # Per-tx limits matching the UI
 GAS_LIMIT_CHUNK_WRITE  = 30_000_000
@@ -226,78 +238,6 @@ ABI_NFT_TRANSFER_EVENT = [{
 }]
 
 
-# ============================================================================
-# .gl1f parsing — mirrors src/local_infer.js gl1fModelLength + parseGl1fPackage
-# ============================================================================
-
-def gl1f_core_length(buf: bytes) -> int:
-    """
-    Compute the exact GL1F core-model byte length, ignoring any optional GL1X
-    JSON footer. Mirrors src/local_infer.js gl1fModelLength().
-    """
-    if len(buf) < 24:
-        raise ValueError("GL1F bytes too short")
-    if buf[:4] != GL1F_MAGIC:
-        raise ValueError(f"Missing GL1F magic (got {buf[:4]!r})")
-    ver = buf[4]
-    depth = struct.unpack_from("<H", buf, 8)[0]
-    pow2 = 1 << depth
-    internal = pow2 - 1
-    per_tree = internal * 8 + pow2 * 4
-
-    if ver == 1:
-        n_trees = struct.unpack_from("<I", buf, 10)[0]
-        expect = 24 + n_trees * per_tree
-    elif ver == 2:
-        trees_per_class = struct.unpack_from("<I", buf, 10)[0]
-        n_classes = struct.unpack_from("<H", buf, 22)[0]
-        trees_off = 24 + n_classes * 4
-        expect = trees_off + (trees_per_class * n_classes) * per_tree
-    else:
-        raise ValueError(f"Unsupported GL1F version {ver}")
-
-    if len(buf) < expect:
-        raise ValueError(f"Model bytes truncated ({len(buf)} < {expect})")
-    return expect
-
-
-@dataclass
-class DecodedHeader:
-    version:    int
-    n_features: int
-    depth:      int
-    n_trees:    int
-    base_q:     int
-    scale_q:    int
-
-
-def parse_gl1x_footer(buf: bytes, core_len: int) -> Optional[dict]:
-    """
-    Parse the optional GL1X JSON footer that follows the GL1F core. Returns
-    the decoded package dict (the same object the studio's parseGl1fPackage
-    returns as `pkg`), or None if there is no footer or it's malformed.
-
-    Footer layout (mirrors src/local_infer.js parseGl1fPackage):
-      offset core_len + 0  : 4 bytes magic "GL1X"
-      offset core_len + 4  : 4 bytes version (currently 1)
-      offset core_len + 8  : 4 bytes uint32 little-endian JSON payload length
-      offset core_len + 12 : payload bytes (UTF-8 JSON)
-    """
-    if len(buf) < core_len + 12:
-        return None
-    if buf[core_len:core_len + 4] != GL1X_MAGIC:
-        return None
-    json_len = struct.unpack_from("<I", buf, core_len + 8)[0]
-    start = core_len + 12
-    end = start + json_len
-    if json_len <= 0 or end > len(buf):
-        return None
-    try:
-        return json.loads(buf[start:end].decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError):
-        return None
-
-
 def unpack_nft_features_string(packed: str) -> tuple[Optional[dict], list[str]]:
     """
     Parse a featuresPacked string back into (meta, featureNames).
@@ -317,31 +257,6 @@ def unpack_nft_features_string(packed: str) -> tuple[Optional[dict], list[str]]:
             meta = None
             start = 0
     return meta, lines[start:]
-
-
-def decode_gl1f_header(core: bytes) -> DecodedHeader:
-    """
-    Decode the GL1F header to extract the fields registerModel needs:
-    nFeatures, nTrees, depth, baseQ, scaleQ. Mirrors src/local_infer.js
-    decodeModel for both v1 and v2.
-
-    Note: registerModel takes a single uint32 nTrees and an int32 baseQ.
-    For v2 (multiclass / multilabel) the UI passes treesPerClass as nTrees
-    and the decoded baseQ field equals readI32 at offset 14 (which v2
-    declares as reserved — still a valid int32 read; matches the UI exactly).
-    """
-    if core[:4] != GL1F_MAGIC:
-        raise ValueError("not a GL1F header")
-    ver = core[4]
-    if ver not in (1, 2):
-        raise ValueError(f"unsupported GL1F version {ver}")
-    n_features = struct.unpack_from("<H", core, 6)[0]
-    depth      = struct.unpack_from("<H", core, 8)[0]
-    n_trees    = struct.unpack_from("<I", core, 10)[0]
-    base_q     = struct.unpack_from("<i", core, 14)[0]   # signed
-    scale_q    = struct.unpack_from("<I", core, 18)[0]
-    return DecodedHeader(version=ver, n_features=n_features, depth=depth,
-                          n_trees=n_trees, base_q=base_q, scale_q=scale_q)
 
 
 # ============================================================================
@@ -453,27 +368,6 @@ def log_err(msg: str) -> None:
 
 
 # ============================================================================
-# State / artifacts
-# ============================================================================
-
-def load_state(path: Path) -> dict:
-    if not path.exists():
-        return {"completed_chunks": [], "table_ptr": None, "register_tx_hash": None}
-    try:
-        with open(path) as f:
-            return json.load(f)
-    except (OSError, json.JSONDecodeError):
-        return {"completed_chunks": [], "table_ptr": None, "register_tx_hash": None}
-
-
-def save_state(path: Path, state: dict) -> None:
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    with open(tmp, "w") as f:
-        json.dump(state, f, indent=2)
-    os.replace(tmp, path)
-
-
-# ============================================================================
 # Transaction helpers
 # ============================================================================
 
@@ -529,15 +423,15 @@ def send_with_retry(w3: Web3, account, *, build_tx_fn,
             last_tx_hash = tx_hash.hex()
             log(f"  [{tag}] tx.hash {last_tx_hash}  "
                 f"(nonce={last_nonce} gasPrice={current_gas_price} attempt={attempt})")
-        except ValueError as e:
+        except ValueError as exc:
             # Common: "already known" / "replacement transaction underpriced" /
             # "nonce too low". The first means our previous send went through;
             # the second means our bump wasn't big enough; the third means the
             # tx already mined. Try to recover by polling for the previous
             # hash, otherwise rebuild with a higher bump.
-            msg = str(e).lower()
+            msg = str(exc).lower()
             if "already known" in msg or "nonce too low" in msg:
-                log(f"  [{tag}] node says: {e}; polling for prior tx")
+                log(f"  [{tag}] node reports a known/consumed nonce; polling prior tx")
                 if last_tx_hash:
                     try:
                         rcpt = w3.eth.wait_for_transaction_receipt(
@@ -564,10 +458,13 @@ def send_with_retry(w3: Web3, account, *, build_tx_fn,
                 tx_hash, timeout=TX_TIMEOUT_SECONDS,
                 poll_latency=TX_POLL_INTERVAL)
             return _check_receipt(rcpt, tag)
-        except Exception as e:
+        except Exception as exc:
             # Timeout, network drop, etc. Poll once for the receipt directly
             # (handles flaky RPCs that miss the wait window).
-            log(f"  [{tag}] wait failed: {e}; polling once before resubmit")
+            log(
+                f"  [{tag}] receipt wait failed ({type(exc).__name__}); "
+                "polling once before resubmit"
+            )
             try:
                 rcpt = w3.eth.get_transaction_receipt(tx_hash)
                 if rcpt is not None:
@@ -578,7 +475,7 @@ def send_with_retry(w3: Web3, account, *, build_tx_fn,
             if attempt > TX_MAX_RESUBMITS:
                 raise RuntimeError(
                     f"[{tag}] giving up after {TX_MAX_RESUBMITS} resubmits; "
-                    f"last hash {last_tx_hash}") from e
+                    f"last hash {last_tx_hash}") from exc
             current_gas_price = int(current_gas_price * TX_GAS_BUMP_FACTOR)
             log(f"  [{tag}] timeout; resubmitting at gasPrice={current_gas_price}")
 
@@ -671,7 +568,7 @@ def confirm(message: str, *, exact_phrase: Optional[str] = None) -> bool:
 # Main flow
 # ============================================================================
 
-def main() -> int:
+def _main() -> int:
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -754,10 +651,11 @@ def main() -> int:
         rpc_source = "default"
 
     # ------------------------------------------------------------------ web3
-    log(f"Connecting to {rpc_url}  (source: {rpc_source})")
+    rpc_identity = safe_rpc_endpoint_identity(rpc_url)
+    log(f"Connecting to {rpc_identity}  (source: {rpc_source})")
     w3 = Web3(Web3.HTTPProvider(rpc_url, request_kwargs={"timeout": 60}))
     if not w3.is_connected():
-        log_err(f"cannot reach RPC {rpc_url}")
+        log_err(f"cannot reach RPC {rpc_identity}")
         return 1
     chain_id = w3.eth.chain_id
     if chain_id != DEFAULTS["chain_id"]:
@@ -777,21 +675,76 @@ def main() -> int:
         log_err(f".gl1f file not found: {args.gl1f}")
         return 1
     raw = args.gl1f.read_bytes()
-    core_len = gl1f_core_length(raw)
-    core = raw[:core_len]
-    has_footer = len(raw) > core_len
+    try:
+        package = parse_gl1f_package(raw)
+        n_chunks = validate_deployed_registry_profile(
+            package,
+            chunk_size=CHUNK_SIZE,
+        )
+    except FormatError as exc:
+        log_err(f"invalid or non-canonical .gl1f package: {exc}")
+        return 1
+
+    core = package.core
+    core_len = len(core)
+    has_footer = package.footer is not None
     model_id = keccak(core)
-    header = decode_gl1f_header(core)
+    model_id_hex = "0x" + model_id.hex()
+    header = package.header
+
+    # Load and validate resumable state before any owner-key generation or
+    # transaction work.  A normal run refuses to trample a prior workflow;
+    # --resume requires an existing, model-bound, internally consistent file.
+    # Resolve only the output directory.  Resolving the complete path would
+    # dereference a hostile final-component symlink before no-follow checks.
+    output_directory = Path.cwd().resolve()
+    state_path = output_directory / STATE_FILE
+    artifact_path = output_directory / ARTIFACTS_FILE
+    try:
+        if args.resume:
+            state = load_mint_state(
+                state_path,
+                expected_model_id=model_id_hex,
+                n_chunks=n_chunks,
+            )
+        else:
+            if state_path.exists() or state_path.is_symlink():
+                raise WorkflowStateError(
+                    f"mint state already exists: {state_path}; use --resume or "
+                    "move it aside deliberately"
+                )
+            state = empty_mint_state(model_id_hex)
+    except WorkflowStateError as exc:
+        log_err(str(exc))
+        return 1
+    if not args.dry_run and (artifact_path.exists() or artifact_path.is_symlink()):
+        log_err(
+            f"artifact path already exists: {artifact_path}; move it aside "
+            "deliberately before minting"
+        )
+        return 1
+
+    def persist_state() -> None:
+        nonlocal state
+        state = save_mint_state(
+            state_path,
+            state,
+            expected_model_id=model_id_hex,
+            n_chunks=n_chunks,
+        )
 
     log()
     log(f"Loaded .gl1f:        {args.gl1f}  ({len(raw):,} bytes total)")
     log(f"Core model bytes:    {core_len:,}  (footer present: {has_footer})")
-    log(f"modelId (keccak256): 0x{model_id.hex()}")
+    log(f"modelId (keccak256): {model_id_hex}")
     log(f"GL1F version:        {header.version}")
     log(f"nFeatures:           {header.n_features}")
     log(f"depth:               {header.depth}")
-    log(f"nTrees:              {header.n_trees}")
-    log(f"baseQ:               {header.base_q}")
+    log(f"nTrees (registry):    {header.registry_n_trees}")
+    if header.version == 2:
+        log(f"trees/output:         {header.trees_per_output}")
+    log(f"nOutputs:             {header.n_outputs}")
+    log(f"baseQ (registry):     {header.registry_base_q}")
     log(f"scaleQ:              {header.scale_q}")
 
     # ------------------------------------------------------------------ extract metadata from GL1X footer
@@ -800,7 +753,7 @@ def main() -> int:
     # string verbatim so the on-chain bytes are byte-identical to what the
     # trainer constructed. We also surface footer-stored title / description /
     # icon as prompt defaults that the user can accept or override.
-    pkg = parse_gl1x_footer(raw, core_len) if has_footer else None
+    pkg = package.footer
     footer_features_packed: Optional[str] = None
     footer_task: Optional[str] = None
     footer_feature_names: Optional[list[str]] = None
@@ -906,6 +859,25 @@ def main() -> int:
     log(f"Registry: {registry_addr}")
     log(f"NFT:      {nft_addr}")
 
+    if args.resume:
+        try:
+            validate_resume_chain_state(
+                state,
+                core=core,
+                chunk_size=CHUNK_SIZE,
+                fetch_code=w3.eth.get_code,
+                fetch_receipt=w3.eth.get_transaction_receipt,
+                pointer_from_receipt=lambda receipt: parse_chunk_written(
+                    w3, store, receipt
+                ),
+                expected_store=store_addr,
+                expected_sender=account.address,
+            )
+        except WorkflowStateError as exc:
+            log_err(str(exc))
+            return 1
+        log("Resume pointers, receipts, and deployed ModelStore bytes verified.")
+
     # ------------------------------------------------------------------ fees
     log()
     log("Reading registry fees and license/ToS metadata...")
@@ -936,7 +908,6 @@ def main() -> int:
         return 1
 
     # ------------------------------------------------------------------ chunking
-    n_chunks = (core_len + CHUNK_SIZE - 1) // CHUNK_SIZE
     log()
     log(f"Chunking: total={core_len:,} chunkSize={CHUNK_SIZE} chunks={n_chunks}")
     log(f"Estimated transactions: {n_chunks} chunk writes + 1 table write + 1 register = {n_chunks + 2}")
@@ -1001,47 +972,6 @@ def main() -> int:
     icon_bytes = validate_icon_128(Path(icon_path_str))
     log(f"  icon OK: {len(icon_bytes)} bytes")
 
-    # ------------------------------------------------------------------ owner key
-    log()
-    print("=" * 72)
-    print("OWNER API ACCESS KEY")
-    print("=" * 72)
-    print("This is a fresh ECDSA keypair you control. The PUBLIC ADDRESS is")
-    print("written on-chain and grants perpetual API-key inference access.")
-    print("The PRIVATE KEY is needed to sign predictAccessView calls later.")
-    print("The contract has no key-recovery mechanism; if you lose this")
-    print("private key, you can replace it later with setOwnerAccessKey()")
-    print("from the model's NFT owner address.")
-    print()
-    owner_acct = Account.create()
-    owner_path = Path(OWNER_KEY_FILE).resolve()
-    owner_path.write_text(
-        f"# Forest Model NFT owner API access keypair\n"
-        f"# Generated:  {now_ts()}\n"
-        f"# Title:      {title}\n"
-        f"# modelId:    0x{model_id.hex()}\n"
-        f"#\n"
-        f"OWNER_ADDRESS={owner_acct.address}\n"
-        f"OWNER_PRIVATE_KEY={owner_acct.key.hex()}\n",
-        encoding="utf-8",
-    )
-    try:
-        os.chmod(owner_path, 0o600)
-    except OSError:
-        pass
-    log(f"Owner address:      {owner_acct.address}")
-    log(f"Owner private key:  written to {owner_path} (mode 0600)")
-    log()
-    log("ACTION REQUIRED: copy the private key out of owner_key.txt and store")
-    log("it somewhere safe. After this prompt, the script will continue.")
-    log()
-    if not confirm(
-        'Type exactly "I saved it" to continue:  ',
-        exact_phrase="I saved it",
-    ):
-        log_err("owner private key not confirmed; aborting")
-        return 1
-
     # ------------------------------------------------------------------ pricing
     pricing_mode = args.pricing_mode
     if pricing_mode == 0:
@@ -1090,12 +1020,20 @@ def main() -> int:
     print(f"Icon:                 {len(icon_bytes)} bytes")
     print(f"Task:                 {task}")
     print(f"Features:             {header.n_features}")
-    print(f"Trees:                {header.n_trees}")
+    print(f"Trees (registry):     {header.registry_n_trees}")
     print(f"Depth:                {header.depth}")
     print(f"Model bytes:          {core_len:,} ({n_chunks} chunks of "
           f"{CHUNK_SIZE} bytes)")
-    print(f"modelId:              0x{model_id.hex()}")
-    print(f"Owner key (public):   {owner_acct.address}")
+    print(f"modelId:              {model_id_hex}")
+    if state.get("owner_key_address"):
+        owner_summary = f"reuse {state['owner_key_address']}"
+    elif args.resume:
+        owner_summary = "validate and reuse owner_key.txt"
+    elif args.dry_run:
+        owner_summary = "not generated (dry run)"
+    else:
+        owner_summary = "generate after final confirmation"
+    print(f"Owner key:            {owner_summary}")
     print(f"Pricing mode:         {pricing_mode}  ({['free','tips','paid'][pricing_mode]})")
     print(f"Pricing feeWei:       {fee_wei}")
     print(f"Pricing recipient:    {recipient}")
@@ -1105,7 +1043,25 @@ def main() -> int:
     print(f"Estimated tx count:   {n_chunks + 2}")
     print(f"Gas price per tx:     {gp} gwei")
     print()
+    owner_path = output_directory / OWNER_KEY_FILE
     if args.dry_run:
+        try:
+            dry_owner = acquire_owner_key(
+                owner_path,
+                expected_model_id=model_id_hex,
+                title=title,
+                generated_at=now_ts(),
+                resume=args.resume,
+                dry_run=True,
+                create_account=Account.create,
+                account_from_key=Account.from_key,
+            )
+            if dry_owner is not None:
+                bind_owner_key(state, dry_owner.address)
+                log(f"DRY RUN: validated resume owner key {dry_owner.address}.")
+        except (OwnerKeyError, WorkflowStateError) as exc:
+            log_err(str(exc))
+            return 1
         log("DRY RUN: stopping before sending any transactions.")
         return 0
     if not confirm(
@@ -1115,22 +1071,72 @@ def main() -> int:
         log_err("not confirmed; aborting")
         return 1
 
+    # ------------------------------------------------------------------ owner key
+    # No key is generated before the dry-run/final-confirmation boundary.
+    # Resume always reuses a model-bound key and never overwrites it.
+    try:
+        owner_material = acquire_owner_key(
+            owner_path,
+            expected_model_id=model_id_hex,
+            title=title,
+            generated_at=now_ts(),
+            resume=args.resume,
+            dry_run=False,
+            create_account=Account.create,
+            account_from_key=Account.from_key,
+        )
+        if owner_material is None:  # defensive; dry_run=False always returns one
+            raise OwnerKeyError("owner key acquisition unexpectedly returned no key")
+        owner_acct = owner_material.account
+        state = bind_owner_key(state, owner_material.address)
+        try:
+            persist_state()
+        except Exception:
+            # A newly created key has not been used by any transaction yet. If
+            # the initial state reservation cannot be persisted, remove that
+            # otherwise-unresumable key rather than leave a dangerous orphan.
+            if owner_material.created:
+                try:
+                    owner_path.unlink()
+                except FileNotFoundError:
+                    pass
+            raise
+    except (OSError, OwnerKeyError, WorkflowStateError) as exc:
+        log_err(str(exc))
+        return 1
+
+    log()
+    print("=" * 72)
+    print("OWNER API ACCESS KEY")
+    print("=" * 72)
+    if owner_material.created:
+        print("A fresh owner API key was created with mode 0600.")
+    else:
+        print("The existing model-bound owner API key was validated and reused.")
+    print("The PUBLIC ADDRESS grants perpetual API-key inference access.")
+    print("The PRIVATE KEY is needed to sign predictAccessView calls later.")
+    print("The private key cannot be recovered; store it securely. The Model NFT")
+    print("owner can register a replacement later with setOwnerAccessKey().")
+    print()
+    log(f"Owner address:      {owner_acct.address}")
+    log(f"Owner private key:  {'written to' if owner_material.created else 'loaded from'} "
+        f"{owner_path} (mode 0600)")
+    log()
+    if not confirm(
+        'Type exactly "I saved it" to continue:  ',
+        exact_phrase="I saved it",
+    ):
+        log_err("owner private key not confirmed; no transaction was sent; "
+                "rerun with --resume")
+        return 1
+
     # ------------------------------------------------------------------ resume state
-    state_path = Path(STATE_FILE).resolve()
-    state = load_state(state_path) if args.resume else {
-        "completed_chunks": [],
-        "table_ptr":        None,
-        "register_tx_hash": None,
-    }
     completed = list(state.get("completed_chunks") or [])
-    if args.resume and completed:
-        if completed[0].get("model_id") != "0x" + model_id.hex():
-            log_err("mint_state.json modelId does not match current .gl1f; "
-                    "delete the state file or restart without --resume")
-            return 1
+    if args.resume:
         log()
         log(f"Resuming from chunk {len(completed)}/{n_chunks} "
-            f"(table_ptr={state.get('table_ptr')})")
+            f"(table_ptr={state.get('table_ptr')}, "
+            f"registered={bool(state.get('register_tx_hash'))})")
 
     # ------------------------------------------------------------------ chunk loop
     log()
@@ -1161,16 +1167,19 @@ def main() -> int:
         log(f"  pointer: {ptr}")
         pointers.append(ptr)
 
+        chunk_tx_hash = (rcpt["transactionHash"].hex()
+                         if hasattr(rcpt["transactionHash"], "hex")
+                         else str(rcpt["transactionHash"]))
+        if not chunk_tx_hash.startswith("0x"):
+            chunk_tx_hash = "0x" + chunk_tx_hash
         completed.append({
             "index":     i,
             "pointer":   ptr,
-            "tx_hash":   rcpt["transactionHash"].hex()
-                         if hasattr(rcpt["transactionHash"], "hex")
-                         else str(rcpt["transactionHash"]),
-            "model_id":  "0x" + model_id.hex(),
+            "tx_hash":   chunk_tx_hash,
+            "model_id":  model_id_hex,
         })
         state["completed_chunks"] = completed
-        save_state(state_path, state)
+        persist_state()
 
     # ------------------------------------------------------------------ pointer table
     table = bytearray(32 * n_chunks)
@@ -1206,55 +1215,106 @@ def main() -> int:
         table_ptr = parse_chunk_written(w3, store, rcpt)
         log(f"  table pointer: {table_ptr}")
         state["table_ptr"] = table_ptr
-        save_state(state_path, state)
+        persist_state()
 
     # ------------------------------------------------------------------ register
     log()
-    log("Registering model (single tx, includes mint of ERC-721 Model NFT)...")
-    register_args = [
-        model_id,                          # bytes32 modelId
-        to_checksum_address(table_ptr),    # address tablePtr
-        CHUNK_SIZE,                        # uint32  chunkSize
-        n_chunks,                          # uint32  numChunks
-        core_len,                          # uint32  totalBytes
-        header.n_features,                 # uint16  nFeatures
-        header.n_trees,                    # uint16  nTrees (truncated; matches UI)
-        header.depth,                      # uint16  depth
-        header.base_q,                     # int32   baseQ
-        header.scale_q,                    # uint32  scaleQ
-        title,                             # string  title
-        desc,                              # string  description
-        icon_bytes,                        # bytes   iconPng32
-        features_packed,                   # string  featuresPacked
-        word_hashes,                       # bytes32[] titleWordHashes
-        pricing_mode,                      # uint8   pricingMode
-        fee_wei,                           # uint256 feeWei
-        recipient,                         # address recipient
-        tos_version,                       # uint32  tosVersionAccepted
-        license_id,                        # uint32  licenseIdAccepted
-        owner_acct.address,                # address ownerKey
-    ]
-    encoded = registry.encode_abi("registerModel", args=register_args)
-    encoded_bytes = bytes.fromhex(encoded[2:] if encoded.startswith("0x") else encoded)
+    if state.get("register_tx_hash"):
+        log("Recovering the recorded registration receipt; no transaction will be resubmitted...")
+    else:
+        log("Registering model (single tx, includes mint of ERC-721 Model NFT)...")
 
-    def build_register_tx(gp_wei, *, _to=registry_addr, _data=encoded_bytes,
-                          _value=required_fee_wei):
-        return build_legacy_tx(
-            w3, account, to=_to, data=_data,
-            gas=GAS_LIMIT_REGISTER, gas_price_wei=gp_wei, value=_value,
+    def submit_registration():
+        register_args = [
+            model_id,                          # bytes32 modelId
+            to_checksum_address(table_ptr),    # address tablePtr
+            CHUNK_SIZE,                        # uint32  chunkSize
+            n_chunks,                          # uint32  numChunks
+            core_len,                          # uint32  totalBytes
+            header.n_features,                 # uint16  nFeatures
+            header.registry_n_trees,           # uint16  nTrees (v2 stores K*R)
+            header.depth,                      # uint16  depth
+            header.registry_base_q,            # int32   baseQ (v2 reserved zero)
+            header.scale_q,                    # uint32  scaleQ
+            title,                             # string  title
+            desc,                              # string  description
+            icon_bytes,                        # bytes   iconPng32
+            features_packed,                   # string  featuresPacked
+            word_hashes,                       # bytes32[] titleWordHashes
+            pricing_mode,                      # uint8   pricingMode
+            fee_wei,                           # uint256 feeWei
+            recipient,                         # address recipient
+            tos_version,                       # uint32  tosVersionAccepted
+            license_id,                        # uint32  licenseIdAccepted
+            owner_acct.address,                # address ownerKey
+        ]
+        encoded = registry.encode_abi("registerModel", args=register_args)
+        encoded_bytes = bytes.fromhex(
+            encoded[2:] if encoded.startswith("0x") else encoded
         )
 
-    rcpt = send_with_retry(
-        w3, account, build_tx_fn=build_register_tx,
-        tag="register", gas_price_wei=gas_price_wei,
-    )
-    reg_tx_hash = (rcpt["transactionHash"].hex()
-                   if hasattr(rcpt["transactionHash"], "hex")
-                   else str(rcpt["transactionHash"]))
-    state["register_tx_hash"] = reg_tx_hash
-    save_state(state_path, state)
+        def build_register_tx(gp_wei, *, _to=registry_addr, _data=encoded_bytes,
+                              _value=required_fee_wei):
+            return build_legacy_tx(
+                w3, account, to=_to, data=_data,
+                gas=GAS_LIMIT_REGISTER, gas_price_wei=gp_wei, value=_value,
+            )
+
+        return send_with_retry(
+            w3, account, build_tx_fn=build_register_tx,
+            tag="register", gas_price_wei=gas_price_wei,
+        )
+
+    try:
+        registration = obtain_registration_receipt(
+            state,
+            fetch_receipt=w3.eth.get_transaction_receipt,
+            submit_registration=submit_registration,
+            expected_registry=registry_addr,
+            expected_sender=account.address,
+        )
+    except WorkflowStateError as exc:
+        log_err(str(exc))
+        return 1
+
+    rcpt = registration.receipt
+    reg_tx_hash = registration.transaction_hash
+    if registration.recovered:
+        log(f"Recovered successful registration receipt: {reg_tx_hash}")
+    else:
+        state["register_tx_hash"] = reg_tx_hash
+        persist_state()
 
     token_id = parse_minted_token_id(w3, nft_addr, rcpt)
+    if token_id is None:
+        log_err("registration receipt has no ModelNFT mint event; refusing to write S1.json")
+        return 1
+    try:
+        registered_summary = registry.functions.getModelSummary(token_id).call()
+        registered_model_id = bytes(registered_summary[1])
+    except Exception as exc:
+        log_err(
+            "cannot verify recovered registry model identity "
+            f"({type(exc).__name__}) via {rpc_identity}"
+        )
+        return 1
+    try:
+        registered_table_ptr = to_checksum_address(registered_summary[2])
+        registered_creator = to_checksum_address(registered_summary[11])
+    except Exception as exc:
+        log_err(f"registered model summary is malformed ({type(exc).__name__})")
+        return 1
+    if (
+        not registered_summary[0]
+        or registered_model_id != bytes(model_id)
+        or registered_table_ptr != to_checksum_address(table_ptr)
+        or registered_creator != to_checksum_address(account.address)
+    ):
+        log_err(
+            "registration receipt does not resolve to the selected "
+            "modelId, pointer table, and signer"
+        )
+        return 1
 
     # ------------------------------------------------------------------ artifacts (S1.json)
     log()
@@ -1264,14 +1324,15 @@ def main() -> int:
     artifact = {
         "deployer_address":     account.address,
         "owner_key_address":    owner_acct.address,
-        "model_id":             "0x" + model_id.hex(),
+        "model_id":             model_id_hex,
         "title":                title,
         "description":          desc,
         "task":                 task,
         "n_features":           header.n_features,
-        "n_trees":              header.n_trees,
+        "n_trees":              header.registry_n_trees,
+        "n_outputs":            header.n_outputs,
         "depth":                header.depth,
-        "base_q":               header.base_q,
+        "base_q":               header.registry_base_q,
         "scale_q":              header.scale_q,
         "version":              header.version,
         "core_bytes":           core_len,
@@ -1294,14 +1355,18 @@ def main() -> int:
         "pricing_fee_wei":      fee_wei,
         "pricing_recipient":    recipient,
         "chain_id":             chain_id,
-        "rpc":                  rpc_url,
+        "rpc":                  rpc_identity,
         "feature_names":        feature_names,
     }
-    artifact_path = Path(ARTIFACTS_FILE).resolve()
-    artifact_path.write_text(json.dumps(artifact, indent=2))
+    try:
+        save_json_artifact_exclusive(artifact_path, artifact)
+    except (OSError, WorkflowStateError) as exc:
+        log_err(str(exc) if isinstance(exc, WorkflowStateError) else
+                "cannot safely publish S1.json")
+        return 1
     log(f"Artifacts written: {artifact_path}")
     log()
-    log(f"modelId:        0x{model_id.hex()}")
+    log(f"modelId:        {model_id_hex}")
     log(f"tokenId:        {token_id if token_id is not None else '(parse failed; check explorer)'}")
     log(f"register tx:    {reg_tx_hash}")
     log(f"table pointer:  {table_ptr}")
@@ -1311,6 +1376,19 @@ def main() -> int:
     log("Owner API key (private) is in owner_key.txt — back it up now.")
     log()
     return 0
+
+
+def main() -> int:
+    """Run the publisher without allowing provider exceptions to leak URLs."""
+    try:
+        return _main()
+    except Exception as exc:
+        log_err(
+            "mint aborted safely after an unexpected "
+            f"{type(exc).__name__}; no exception details were printed because "
+            "provider errors can contain RPC credentials"
+        )
+        return 1
 
 
 if __name__ == "__main__":

@@ -1,0 +1,606 @@
+% GL1F formal-results fragment.
+% Requires: amsmath, amssymb, amsthm, booktabs.
+% Expected theorem environments: definition, lemma, theorem, proposition,
+% corollary, remark.
+
+\section{Formal model and correctness results}
+\label{sec:formal-results}
+
+This section separates three objects that are easy to conflate:
+(i) the mathematical forest, (ii) its GL1F byte representation, and
+(iii) a registry entry that points to EVM code chunks.  The equivalence result
+for the first two is exact under the representation, input, depth, and
+arithmetic premises below.  Its application to a registry entry is also
+conditional on a well-formed storage manifest, because the deployed registry
+does not itself recompute the model hash or validate every serialization
+invariant.
+
+\subsection{Canonical representation}
+
+Let $\mathbb{I}_{32}=[-2^{31},2^{31}-1]\cap\mathbb{Z}$.  A complete binary
+tree of depth $d$ contains
+\begin{equation}
+  L(d)=2^d
+  \quad\text{leaves and}\quad
+  I(d)=2^d-1
+  \quad\text{internal nodes}.
+\end{equation}
+An internal node occupies eight bytes: a little-endian unsigned 16-bit feature
+index, a little-endian signed 32-bit threshold, and two reserved bytes.
+A leaf occupies four bytes containing a little-endian signed 32-bit value.
+Consequently, one serialized tree occupies
+\begin{equation}
+  b(d)=8I(d)+4L(d)=12\cdot 2^d-8
+  \label{eq:tree-bytes}
+\end{equation}
+bytes.
+
+\begin{definition}[Canonical GL1F v1 model]
+\label{def:gl1f-v1}
+A canonical publication-profile scalar model is a byte string $B$ consisting
+of a 24-byte header and $T$ trees, where $F\ge1$, $1\le d\le12$, and
+$0\le T\le2^{32}-1$.  A zero-tree v1 object is the well-defined base-only
+case.  Its header contains magic \texttt{GL1F}, version one, feature count
+$F$, depth $d$, tree count $T$, base value
+$a_0\in\mathbb{I}_{32}$, and scale
+$s\in[1,2^{32}-1]\cap\mathbb{Z}$.  Reserved bytes are zero, every node feature
+is in $\{0,\ldots,F-1\}$, and
+\begin{equation}
+  |B|=24+T b(d).
+  \label{eq:v1-length}
+\end{equation}
+For a deployed-registry EVM application we additionally require equality
+between serialized and registered $F,d,T,a_0,$ and $s$, and
+$T\le2^{16}-1$.  The latter is a deployed-interface restriction: the v1 wire
+field for $T$ is unsigned 32-bit, whereas the deployed registry stores total
+tree count as unsigned 16-bit.
+\end{definition}
+
+\begin{definition}[Canonical GL1F v2 model]
+\label{def:gl1f-v2}
+A canonical publication-profile vector model has $F\ge1$, $1\le d\le12$,
+$K\ge2$ outputs, $R\ge1$ trees per output,
+base vector $(a_{0,0},\ldots,a_{0,K-1})\in\mathbb{I}_{32}^K$, and output-major
+tree order.  Its exact length is
+\begin{equation}
+  |B|=24+4K+KRb(d).
+  \label{eq:v2-length}
+\end{equation}
+The header has magic \texttt{GL1F}, version two, positive $F$ and $s$, and
+zero reserved fields.  Every node feature is smaller than $F$.  Registered
+feature count and scale equal the serialized values.  Publication through the
+deployed registry additionally requires $KR\le2^{16}-1$, because
+that interface stores the total tree count in a 16-bit field; this is narrower
+than the core format's separate 16-bit $K$ and 32-bit $R$ fields.
+\end{definition}
+
+The format does not contain a task discriminator.  Identical v1 bytes can be
+described externally as regression or binary-logit inference, and identical
+v2 bytes can be described as multiclass or multilabel inference.  Here
+$\operatorname{keccak256}$ denotes Ethereum's legacy Keccak-256 function, not
+the standardized FIPS SHA3-256 variant.  Under the usual collision- and
+second-preimage-resistance assumptions, $\operatorname{keccak256}(B)$ binds a
+practical identifier to the exact serialized bytes $B$.  It is not a semantic
+normal form: distinct canonical cores can denote the same extensional integer
+function.  The digest also does not bind a task label, feature semantics,
+preprocessing contract, dataset, or intended use.  Those claims require a
+separately authenticated semantic manifest.
+
+The explicit depth premise matches the current first-party interface.  It is
+substantially narrower than the 16-bit wire field and prevents an apparently
+valid header from requesting an impractically large complete tree or an
+evaluator-specific shift result.
+
+\subsection{Chunked EVM representation}
+
+Let $c$ be the nominal payload of every nonfinal chunk and therefore the
+logical byte-offset stride; the final payload may be shorter.  Let
+$N=\lceil |B|/c\rceil$.  The canonical publisher deploys each payload through
+\texttt{ModelStore.write}, creating runtime code
+\[
+  C_j=\texttt{GL1C}\,\Vert\,
+  B[jc:\min\{(j+1)c,|B|\}].
+\]
+It then creates a table whose data are $N$ 32-byte words; the low 20 bytes of
+word $j$ are the address of $C_j$.  The table is itself prefixed by
+\texttt{GL1C}.
+
+\begin{definition}[Well-formed storage manifest]
+\label{def:manifest}
+For an EVM state $\sigma$ and registry record $r$ in that state, a manifest
+$(P,c,N,\ell)$ is well formed for $B$ at $(\sigma,r)$ when:
+\begin{enumerate}
+  \item $P\ne0$, $4\le c\le24572$, $1\le N\le767$,
+        $\ell=|B|$, and $N=\lceil\ell/c\rceil$;
+  \item table address $P$ has runtime code in $\sigma$ of exact length $4+32N$, beginning
+        with \texttt{GL1C};
+  \item its $j$th word has zero high 12 bytes and resolves through its low
+        20 bytes to nonzero address $C_j$;
+  \item every nonfinal $C_j$ in $\sigma$ has exact code
+        $\texttt{GL1C}\Vert B[jc:(j+1)c]$, and the final chunk has the exact
+        code $\texttt{GL1C}\Vert B[(N-1)c:\ell]$; and
+  \item the corresponding fields of $r$ equal $P,c,N,\ell$.
+\end{enumerate}
+\end{definition}
+
+The lower bound $c\ge4$ is semantic, not cosmetic.  Runtime primitive fields
+are at most four bytes, while the implemented boundary reader consults at most
+two chunks.  A field could span more than two logical chunks if $c<4$.
+
+\begin{lemma}[Pointer capacity]
+\label{lem:pointer-capacity}
+A pointer table created by the deployed storage contract contains at most
+\[
+  \left\lfloor \frac{24572}{32}\right\rfloor=767
+\]
+chunk addresses.
+\end{lemma}
+
+\begin{proof}
+\texttt{ModelStore.write} accepts at most 24572 data bytes, and each table slot
+occupies exactly 32 data bytes.  The four-byte \texttt{GL1C} prefix is added by
+the store and is not part of the payload limit.
+\end{proof}
+
+For a manifest satisfying Definition~\ref{def:manifest}, define the specified
+boundary reader $\operatorname{Read}_{\sigma,M}(o,n)$ to compute
+$j=\lfloor o/c\rfloor$ and $r_o=o\bmod c$, copy from code offset $4+r_o$ in
+chunk $j$, and, only when $r_o+n>c$, concatenate the remaining bytes from code
+offset four in chunk $j+1$.
+
+\begin{lemma}[Exact byte reconstruction]
+\label{lem:reconstruction}
+Given Definition~\ref{def:manifest}, every runtime primitive read of
+$n\in\{1,2,4\}$ bytes at a model offset $o\in\mathbb Z_{\ge0}$ satisfying
+$o+n\le |B|$ returns exactly $B[o:o+n]$.
+\end{lemma}
+
+\begin{proof}
+By Euclidean division, write $o=jc+r$ with
+$j=\lfloor o/c\rfloor$ and $0\le r<c$.  If $r+n\le c$, the runtime resolves
+slot $j$ and copies from code offset $4+r$, which is exactly
+$B[o:o+n]$.  Otherwise it copies $c-r$ bytes from chunk $j$ and
+$n-(c-r)$ bytes from the start of chunk $j+1$.  Since $n\le4\le c$, no third
+chunk is required.  The exact chunk-length and ordering clauses in
+Definition~\ref{def:manifest} make the concatenation equal to $B[o:o+n]$.
+\end{proof}
+
+\begin{remark}
+The \texttt{GL1C} check detects zero and many accidental pointers, but it is
+not content authentication.  Arbitrary EVM code beginning with the same four
+bytes passes that test.  Exact reconstruction is therefore a property of the
+manifest conditions, not of the magic prefix alone.
+\end{remark}
+
+\subsection{Traversal and termination}
+
+Let $i_j$ be the heap index after $j$ decisions, with $i_0=0$.  For packed
+feature $x_q$ and threshold $\theta_q$, a node updates
+\begin{equation}
+ i_{j+1} =
+ \begin{cases}
+  2i_j+2, & x_q>\theta_q,\\
+  2i_j+1, & x_q\le\theta_q.
+ \end{cases}
+ \label{eq:index-update}
+\end{equation}
+
+\begin{lemma}[Traversal interval]
+\label{lem:traversal-interval}
+After $j$ decisions,
+\begin{equation}
+  2^j-1\le i_j\le2^{j+1}-2.
+  \label{eq:index-interval}
+\end{equation}
+\end{lemma}
+
+\begin{proof}
+For $j=0$, both bounds equal zero.  Assume the claim at $j$.
+The smallest possible child is
+$2(2^j-1)+1=2^{j+1}-1$, and the largest is
+$2(2^{j+1}-2)+2=2^{j+2}-2$.  These are precisely the bounds for $j+1$.
+\end{proof}
+
+\begin{corollary}[Leaf-index safety]
+\label{cor:leaf-safety}
+After exactly $d$ decisions,
+\[
+  0\le i_d-I(d)\le L(d)-1.
+\]
+Thus a traversal of a well-formed tree selects exactly one serialized leaf and
+cannot address outside that tree's leaf array.
+\end{corollary}
+
+\begin{proof}
+Substitute $j=d$ in Lemma~\ref{lem:traversal-interval} and subtract
+$I(d)=2^d-1$.
+\end{proof}
+
+\begin{lemma}[Forced-subtree inertness]
+\label{lem:forced-subtree}
+Suppose a terminal node denoting signed int32 value $v$ is replaced by a
+complete forced continuation whose remaining internal nodes use feature zero
+and threshold $2^{31}-1$, and whose descendant leaves all contain that same
+$v$. For every $q\in\mathbb{I}_{32}^F$, traversal through that continuation
+returns $v$; hence the replacement preserves the terminal value over the
+entire packed-input domain.
+\end{lemma}
+
+\begin{proof}
+Definitions~\ref{def:gl1f-v1} and \ref{def:gl1f-v2} give $F\ge1$, so feature
+zero exists.  Because
+$q_0\le2^{31}-1$, the strict predicate
+$q_0>2^{31}-1$ is false at every inserted node and traversal follows the left
+child at each remaining level.  The reached descendant leaf contains $v$.
+Moreover, assigning $v$ to every descendant leaf makes the value independent
+even of the particular descendant selected.  Thus the forced continuation
+cannot change the tree output for any int32 input vector.
+\end{proof}
+
+\begin{theorem}[Finite work and logical traversal state]
+\label{thm:complexity}
+For a canonical v1 model, inference performs exactly $Td$ node decisions and
+$T$ leaf reads.  For a canonical v2 model, inference performs exactly $KRd$
+node decisions and $KR$ leaf reads.  An abstract streaming evaluator that
+does not buffer the model needs $O(1)$ scalar logical traversal state and
+$O(K)$ vector logical traversal state, excluding input storage and
+implementation-specific read buffers.  Model space is $24+Tb(d)$ for v1 and
+$24+4K+KRb(d)$ for v2.
+\end{theorem}
+
+\begin{proof}
+Each complete tree executes the loop in Equation~\ref{eq:index-update} exactly
+$d$ times, followed by one leaf read.  The scalar outer loop visits $T$ trees.
+The vector loops visit $R$ trees for each of $K$ outputs.  No inference loop is
+recursive or conditioned on a model value other than the bounded header
+counts.  A streaming evaluator stores one scalar accumulator or a length-$K$
+result vector together with a constant number of indices and decoded
+primitive values.  The model-space formulae follow from
+Equation~\ref{eq:tree-bytes}.
+\end{proof}
+
+\begin{remark}[Bounded does not imply affordable]
+The theorem establishes a finite operation count.  It does not guarantee that
+an arbitrary encoded dimension fits a transaction gas limit.  The publication
+profile and empirical gas envelope must be reported separately.  The deployed
+Solidity boundary-reader allocates a fresh dynamic byte buffer when one
+primitive spans two chunks.  Since EVM memory allocation is monotonic within a
+call, its transient memory may grow linearly with the number of such boundary
+reads even though every primitive read is at most 32 bytes.  This is an
+implementation cost, not additional logical traversal state.
+\end{remark}
+
+\subsection{Cross-runtime equivalence}
+
+A \emph{conforming forest evaluator} uses the specified little-endian
+signed/unsigned decoding and strict comparison, accumulates the mathematical
+integer sums below without overflow or loss of precision, and selects the
+lowest index among equal maximum logits when returning a class. A conforming
+local evaluator first validates the version-specific canonical definition. A
+\emph{conforming EVM evaluator} at $(\sigma,r)$ obtains every core primitive
+through $\operatorname{Read}_{\sigma,M}$, uses the version-aware registry
+relations below, and otherwise applies the same forest semantics. These are
+specification definitions; source inspection and finite compiled/deployed
+tests separately assess the deployed \texttt{ForestRuntime} path. Client-side
+preprocessing may construct the packed integer vector, but real-number
+quantization is not part of the theorem. Applying the theorem to an external
+endpoint additionally requires its enabled, authorization, and fee conditions
+to reach the internal evaluator with the packed input unchanged.
+
+For a scalar model, define the integer function
+\begin{equation}
+  f_B(q)=a_0+\sum_{t=0}^{T-1}v_{t,\pi_t(q)},
+  \label{eq:scalar-function}
+\end{equation}
+where $\pi_t(q)$ is the leaf selected by
+Equation~\ref{eq:index-update}.  For a vector model,
+\begin{equation}
+  f_{B,k}(q)=a_{0,k}+\sum_{t=0}^{R-1}v_{k,t,\pi_{k,t}(q)}.
+  \label{eq:vector-function}
+\end{equation}
+
+\begin{theorem}[Specification-level conforming-evaluator equivalence]
+\label{thm:equivalence}
+Let $B$ be canonical under Definition~\ref{def:gl1f-v1} or
+Definition~\ref{def:gl1f-v2}, let the EVM manifest satisfy
+Definition~\ref{def:manifest} at the same $(\sigma,r)$ used for evaluation, and
+require the following nine version-aware relations for $r$
+\[
+\begin{gathered}
+nFeatures=F,\qquad
+nTrees=\begin{cases}T&\text{(v1)},\\KR&\text{(v2)},\end{cases}
+\qquad depth=d,\\
+baseQ=\begin{cases}a_0&\text{(v1)},\\0&\text{(v2 registry convention)},\end{cases}
+\qquad scaleQ=s,\qquad tablePtr=P,\\
+totalBytes=\ell,\qquad numChunks=N,\qquad chunkSize=c.
+\end{gathered}
+\]
+Let every evaluator receive the identical $4F$-byte sequence formed by packing
+$q\in\mathbb{I}_{32}^F$ as signed little-endian int32 values. Then conforming
+local and EVM evaluators return $f_B(q)$ for v1 and
+$(f_{B,k}(q))_{k=0}^{K-1}$ for v2. Their v2 class operation returns
+\[
+ \left(\min\operatorname*{arg\,max}_{0\le k<K} f_{B,k}(q),
+       \max_{0\le k<K} f_{B,k}(q)\right),
+\]
+where the minimum implements the specified lowest-index tie rule.
+\end{theorem}
+
+\begin{proof}
+Lemma~\ref{lem:reconstruction} gives identical serialized bytes.  The v2 EVM
+and local evaluators decode the same header, node, threshold, and leaf integers.
+The conforming v1 EVM evaluator uses registered inference fields rather than parsing
+the header; the theorem's nine-relation premise makes those fields
+identical to the local decoder's values, while the node, threshold, and leaf
+integers still follow from Lemma~\ref{lem:reconstruction}.  At the root, every
+evaluator compares the same $q_f$ and $\theta_q$ using the same strict
+predicate.  If their indices agree before a level, the identical predicate and
+Equation~\ref{eq:index-update} give the same next index.  Induction and
+Corollary~\ref{cor:leaf-safety} give the same selected leaf for every tree.
+Finally, Equations~\ref{eq:scalar-function} and
+\ref{eq:vector-function} add the same finite integer sequence to the same base
+term, with the exact-accumulation premise preserving that mathematical sum.
+Applying the same lowest-index argmax scan to the identical v2 vector gives
+the same class index and maximum integer logit.
+\end{proof}
+
+\begin{remark}
+This handwritten theorem concerns conforming evaluator specifications in one
+state and record. Source inspection supports the mapping from the deployed
+Solidity path to that specification; compiled tests and pinned observations
+supply finite implementation evidence. None is a mechanized EVM-bytecode proof,
+verified Solidity-to-bytecode refinement, or source-to-live-bytecode provenance proof.
+\end{remark}
+
+\begin{proposition}[Exact JavaScript accumulation under the deployment profile]
+\label{prop:js-safe}
+All integer accumulators permitted by the canonical ModelStore/registry
+profile are strictly within JavaScript's exact integer range.
+\end{proposition}
+
+\begin{proof}
+For v1, the registry's 16-bit tree count gives
+\[
+ |f_B(q)|\le (65535+1)2^{31}=2^{47}<2^{53}.
+\]
+For v2 with $d\ge1$, Equation~\ref{eq:tree-bytes} gives $b(d)\ge16$.
+Lemma~\ref{lem:pointer-capacity} bounds total core payload by
+$767\cdot24572=18846724$ bytes.  Since $K\ge2$,
+\[
+ R < \frac{18846724}{2\cdot16}<589000.
+\]
+Hence every output and every partial sum obeys
+\[
+ |f_{B,k}(q)|<(589001)2^{31}<2^{51}<2^{53}.
+\]
+All int32 inputs and summands are themselves exactly representable.
+\end{proof}
+
+\begin{remark}
+The theorem concerns inference from fixed bytes.  Byte-identical training is a
+separate empirical claim because split scoring, gradients, and early stopping
+use floating-point arithmetic.  It requires fixed preprocessing, operation
+order, feature/class order, seeded random-number consumption, and compiler
+flags, plus a parity test matrix.
+\end{remark}
+
+\subsection{Fixed-point approximation}
+
+For finite $z\in\mathbb{R}$ and integer $s>0$, define the abstract exact-real
+quantizer with JavaScript's half-toward-positive-infinity tie rule
+\begin{equation}
+  Q_s(z)=\operatorname{clamp}_{\mathbb{I}_{32}}
+  \left(\left\lfloor sz+\frac12\right\rfloor\right).
+  \label{eq:quantizer}
+\end{equation}
+This definition includes the asymmetric negative-half convention of
+\texttt{Math.round}; for example, $Q_1(-1.5)=-1$.
+
+This is a mathematical abstraction.  Production JavaScript first computes the
+binary64 product
+$\operatorname{fl}(sz)=sz+\delta_s(z)$ and then applies
+\texttt{Math.round}.  The two integers agree when that multiplication
+perturbation does not cross an integer rounding boundary.  Without that
+premise, and provided the rounded production result remains in the int32
+range, the direct implementation bound is
+\[
+ \left|
+ \frac{\operatorname{Math.round}(\operatorname{fl}(sz))}{s}-z
+ \right|
+ \le \frac{1/2+|\delta_s(z)|}{s},
+\]
+which can be slightly larger than $1/(2s)$.  If int32 saturation occurs,
+neither bound applies.
+
+\begin{lemma}[Abstract single-value quantization error]
+\label{lem:quant-error}
+If Equation~\ref{eq:quantizer} does not saturate, then
+\[
+ \left|\frac{Q_s(z)}{s}-z\right|\le\frac{1}{2s}.
+\]
+\end{lemma}
+
+\begin{proof}
+For $u=sz$, the integer $\lfloor u+1/2\rfloor$ lies in
+$[u-1/2,u+1/2]$.  Divide by positive $s$.
+\end{proof}
+
+\begin{theorem}[Stable-path output error]
+\label{thm:stable-path-error}
+Consider an ideal scalar forest whose base and the $T$ leaves selected for
+input $x$ are independently quantized by Equation~\ref{eq:quantizer} without
+saturation at common scale $s$.  If quantization does not change any selected
+path, the dequantized GL1F output
+$\widehat y$ satisfies
+\[
+ |\widehat y-y|\le\frac{T+1}{2s}.
+\]
+For one output of a v2 model, replace $T$ by $R$.
+\end{theorem}
+
+\begin{proof}
+Apply Lemma~\ref{lem:quant-error} to the base and every selected leaf, then use
+the triangle inequality.
+\end{proof}
+
+\begin{lemma}[Sufficient split-margin condition]
+\label{lem:split-margin}
+Suppose neither $x$ nor threshold $\theta$ saturates.  If
+\[
+ |x-\theta|>\frac1s,
+\]
+then the truth value of $x>\theta$ equals that of
+$Q_s(x)>Q_s(\theta)$.
+\end{lemma}
+
+\begin{proof}
+If $x>\theta+1/s$, Lemma~\ref{lem:quant-error} implies
+$Q_s(x)/s\ge x-1/(2s)>\theta+1/(2s)\ge Q_s(\theta)/s$.
+The reverse ordering is analogous.
+\end{proof}
+
+\begin{corollary}[Argmax stability]
+\label{cor:argmax}
+Assume stable paths and unsaturated base/leaf quantization for a v2 model.  If
+the difference between the largest and second-largest ideal logits exceeds
+\[
+ \frac{R+1}{s},
+\]
+the GL1F integer argmax returns the same class.  Equal integer logits are
+resolved deterministically in favor of the lowest class index.
+\end{corollary}
+
+\begin{proof}
+Theorem~\ref{thm:stable-path-error} perturbs each of the two logits by at most
+$(R+1)/(2s)$.  Their order therefore cannot reverse under the stated margin.
+The implementation replaces the incumbent only on strict improvement, which
+establishes the tie rule.
+\end{proof}
+
+\begin{remark}[Why a global error bound needs a margin]
+Near a split, quantization can select a different leaf.  The difference
+between two leaves is not bounded by the rounding error alone.  Therefore
+Theorem~\ref{thm:stable-path-error} must not be quoted without its stable-path
+condition unless an additional bound on alternate-leaf values is supplied.
+For production binary64 preprocessing, replace every $1/(2s)$ term above by
+$(1/2+|\delta_s(z)|)/s$ for the corresponding quantized value, unless the
+implementation is shown to emit the same integer as the abstract quantizer;
+either alternative still requires that the corresponding int32 clamp not
+saturate.  Provided neither operand saturates, a sufficient production split
+margin is therefore
+\[
+ |x-\theta|>
+ \frac{1+|\delta_s(x)|+|\delta_s(\theta)|}{s}.
+\]
+\end{remark}
+
+\subsection{Limits of what the current registry proves}
+
+For clarity, the live verifier names nine relations rather than using an
+undefined ``applicable metadata'' category.  It checks
+\[
+\begin{split}
+ &nFeatures=F,\qquad
+ nTrees=\begin{cases}T&\text{(v1)},\\KR&\text{(v2)},\end{cases}
+ \qquad depth=d,\\
+ &baseQ=\begin{cases}a_0&\text{(v1)},\\0&\text{(v2 reserved-field convention)},\end{cases}
+ \qquad scaleQ=s,\\
+ &tablePtr=P,\qquad totalBytes=\ell,\qquad
+ numChunks=N,\qquad chunkSize=c.
+\end{split}
+\]
+The first five reconcile runtime registry metadata with the decoded core; the
+last four reconcile the runtime and byte-information registry getters with
+the storage manifest.
+
+\begin{proposition}[No unconditional content binding]
+\label{prop:no-binding}
+For the deployed registry entry point, the existence of a record under
+identifier $h$ does not imply
+$h=\operatorname{keccak256}(B)$ for the bytes reconstructed from its pointer
+table.
+\end{proposition}
+
+\begin{proof}
+The registration predicate checks only that $h\ne0$ and that no prior record
+exists under $h$; it accepts $h$ and the pointer metadata as independent
+arguments.  Choose any nonzero $h$ and any accepted pointer tuple reconstructing
+$B$ with $h\ne\operatorname{keccak256}(B)$.  The call can satisfy the remaining
+fee, metadata, ToS, and licence checks.  Thus a valid transaction is a
+counterexample to the implication.
+\end{proof}
+
+\begin{remark}[Executable assurance-boundary witness]
+The isolated-chain integration test makes the counterexample concrete.  The
+unmodified registry accepted this identifier:
+\begin{center}
+\small\ttfamily
+0x60c713e19362bcb16b04fb6fc611821a\\
+8a3fb90e1698490bf4819c2c44838875
+\end{center}
+for a pointer tuple whose 104 reconstructed bytes have hash
+\begin{center}
+\small\ttfamily
+0xeb0ee33a46399a8592b6676035a7e580\\
+c1f90e7761a2eb1f4a56d0f9f0e4ab18.
+\end{center}
+The runtime followed that record and returned integer prediction $1043$.
+The production JavaScript chain loader now recomputes
+$\operatorname{keccak256}(B)$ after exact reconstruction and rejects this
+mismatch before returning model bytes.  This client-side check mitigates the
+deployed assurance gap; it does not change the registry predicate.
+\end{remark}
+
+\begin{corollary}[Need for independent verification]
+Theorem~\ref{thm:equivalence} applies to a registry entry only after an
+independent verifier establishes Definitions~\ref{def:gl1f-v1} or
+\ref{def:gl1f-v2}, Definition~\ref{def:manifest}, and all nine relations above.
+If the registry key is additionally claimed as a content identifier, that
+separate deployment-identity claim requires
+$h=\operatorname{keccak256}(B)$; this equality is not a premise of execution
+equivalence for the reconstructed bytes.
+\end{corollary}
+
+\begin{proposition}[Open model storage permits independent local inference]
+\label{prop:public-model}
+Under the documented GL1C storage design, an observer with chain-read access can
+reconstruct the intentionally public model and evaluate it locally,
+independently of the canonical runtime endpoint.
+\end{proposition}
+
+\begin{proof}
+The pointer table and every chunk are public EVM runtime code retrievable by
+address.  Definition~\ref{def:manifest} gives a constructive algorithm for
+reassembling $B$.  Equations~\ref{eq:scalar-function} and
+\ref{eq:vector-function} then define a local evaluator using only public
+integers.  No secret required by evaluation is held by the fee-gated
+contract.
+\end{proof}
+
+\begin{remark}
+Mode-2 payment can still meter use of an official transaction endpoint,
+produce an on-chain event, or support service-level economics.  It is not
+model encryption, copy protection, or exclusive inference.
+\end{remark}
+
+\subsection{Proof obligations for a publication-grade deployment}
+
+The strongest reproducibility record should contain:
+\begin{enumerate}
+  \item the exact core bytes and both SHA-256 and Keccak-256 digests;
+  \item all chunk addresses, runtime code hashes, ordered table address,
+        $c,N,$ and $\ell$;
+  \item a strict parser report covering magic, version, reserved fields,
+        dimensions, exact length, and every feature index;
+  \item the nine named registry/core/storage relations above, plus any
+        separately claimed NFT feature metadata;
+  \item packed feature vectors and integer outputs for conformance cases;
+  \item source revision, compiler version and binary digest, optimizer
+        settings, IR setting, EVM target, creation bytecode, and deployed
+        bytecode hash; and
+  \item a parity matrix that distinguishes byte-identical training evidence
+        from the inference theorem proved above.
+\end{enumerate}
+
+These obligations make the claim falsifiable: an independent party can either
+reproduce every integer output or identify the first violated premise.

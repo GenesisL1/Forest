@@ -1,0 +1,34 @@
+cff-version: 1.2.0
+message: "If you use GL1F Forest in research, cite this software record and the accompanying public technical report."
+title: "GL1F Forest: Reconstructible Integer Gradient-Boosted Trees for Exact Local and EVM Inference"
+type: software
+authors:
+  - family-names: Fedorov
+    given-names: Mikhail
+repository-code: "https://github.com/GenesisL1/Forest"
+url: "https://gl1f.com"
+version: 0.2.3
+date-released: "2026-09-05"
+license: MIT
+keywords:
+  - gradient-boosted decision trees
+  - deterministic inference
+  - EVM
+  - blockchain
+  - model serialization
+  - reproducible computing
+abstract: >-
+  GL1F Forest is an open implementation of fixed-depth,
+  integer-quantized gradient-boosted decision trees with browser, Python, C++,
+  and Solidity execution surfaces. Its canonical public binary representation
+  supports independent reconstruction and exact integer replay.
+references:
+  - type: report
+    title: "Artifact-to-Execution Assurance for Canonical Integer GBDTs on the EVM"
+    authors:
+      - family-names: Fedorov
+        given-names: Mikhail
+    notes: "Public technical report; not peer reviewed."
+    date-released: "2026-09-05"
+    year: 2026
+    url: "https://github.com/GenesisL1/Forest/blob/main/GL1F.pdf"

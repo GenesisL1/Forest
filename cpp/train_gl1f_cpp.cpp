@@ -4,7 +4,8 @@
 // Intended to be API-compatible with train_gl1f.py for use with local_trainer_server.py.
 //
 // Build (example):
-//   g++ -O3 -std=c++17 -o train_gl1f_cpp cpp/train_gl1f_cpp.cpp
+//   g++ -O3 -std=c++17 -ffp-contract=off -fno-fast-math \
+//       -o train_gl1f_cpp cpp/train_gl1f_cpp.cpp
 //
 // Notes:
 // - This is a straightforward port of the Python trainer logic (fixed-depth, complete binary trees).
@@ -22,6 +23,7 @@
 #include <cstdint>
 #include <cstring>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <limits>
 #include <optional>
@@ -48,12 +50,9 @@ static inline std::string now_iso_utc() {
 #else
   gmtime_r(&t, &tm);
 #endif
-  char buf[32];
-  // 2026-01-24T12:34:56Z
-  std::snprintf(buf, sizeof(buf), "%04d-%02d-%02dT%02d:%02d:%02dZ",
-                tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
-                tm.tm_hour, tm.tm_min, tm.tm_sec);
-  return std::string(buf);
+  std::ostringstream out;
+  out << std::put_time(&tm, "%Y-%m-%dT%H:%M:%SZ");
+  return out.str();
 }
 
 // Match JavaScript Math.round(x) for finite values: floor(x + 0.5)

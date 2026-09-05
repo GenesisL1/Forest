@@ -277,10 +277,20 @@ def softmax_probs_inplace(predQ_flat: np.ndarray, n_rows: int, n_classes: int, s
     # subtract max per row for stability
     max_z = np.max(mat, axis=1, keepdims=True) / float(scaleQ)
     z = (mat / float(scaleQ)) - max_z
-    np.exp(z, out=out_prob)  # casts to float32 if out_prob is float32
-    s = np.sum(out_prob, axis=1, keepdims=True)
-    s = np.where(s > 0, s, 1.0)
-    out_prob /= s
+
+    # Match the browser and C++ operation profile exactly: exponentials and
+    # the normalizer are binary64, the stored numerator is rounded to
+    # binary32, and division promotes that rounded numerator back to
+    # binary64 before the final binary32 assignment. Writing np.exp() directly
+    # into out_prob would round before summation and can move a later
+    # quantized leaf by one Q unit.
+    exp64 = np.exp(z)
+    sum64 = np.zeros(n_rows, dtype=np.float64)
+    for class_index in range(n_classes):
+        sum64 += exp64[:, class_index]
+    sum64 = np.where(sum64 > 0, sum64, 1.0)
+    numerator64 = exp64.astype(np.float32).astype(np.float64)
+    out_prob[...] = (numerator64 / sum64[:, None]).astype(np.float32)
 
 
 def logloss_acc_multiclass(

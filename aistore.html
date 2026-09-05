@@ -50,7 +50,9 @@ SOFTWARE.
 <title>GenesisL1 Forest — AI Store Marketplace</title>
   <link rel="icon" href="data:," />
   <link rel="stylesheet" href="./style.css" />
-  <script src="https://cdn.jsdelivr.net/npm/ethers@6.12.1/dist/ethers.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.12.1/dist/ethers.umd.min.js"
+    integrity="sha384-ZE/wK5p9CtYydQ2IWO7H7mb0024vP3kJ1eOG7JD9+UA/0VBGZeYIxtttlh93VoK7"
+    crossorigin="anonymous"></script>
 </head>
 <body>
   <div class="container">
@@ -60,30 +62,31 @@ SOFTWARE.
        <img src="https://genesisl1.com/logo.svg" alt="GenesisL1" style="width:28px; height:28px;" /> GenesisL1 Forest </a>
       </div>
       <button class="btn navToggle" type="button" aria-label="Menu" aria-controls="siteNav" aria-expanded="false"><span class="navToggleIcon" aria-hidden="true"></span></button>
-      <div class="nav" id="siteNav" aria-label="Primary navigation">
+      <nav class="nav" id="siteNav" aria-label="Primary navigation">
         <a class="btn ghost" data-nav="forest" href="./forest.html">AI Models</a>
         <a class="btn ghost" data-nav="market" href="./aistore.html">AI Store</a>
         <a class="btn ghost" data-nav="create" href="./create.html">Create</a>
         <a class="btn ghost" data-nav="my" href="./my.html">My Models</a>
         <a class="btn ghost" data-nav="terms" href="./terms.html">Terms</a>
         <span class="pill" id="walletPill">Read-only (RPC)</span>
-        <button class="btn primary" id="connectBtn">Connect Wallet</button>
-      </div>
+        <button type="button" class="btn primary" id="connectBtn">Connect Wallet</button>
+      </nav>
     </div>
 
+    <main id="main">
     <div class="hero">
       <h1>AI Store Marketplace</h1>
       <p class="muted">Only models actively listed for sale are shown here. Buying transfers the Model NFT.</p>
 
       <div class="row spread" style="flex-wrap: wrap;">
         <div style="flex: 1; min-width: 320px;">
-          <label>Search title (words)</label>
+          <label for="searchBox">Search title (words)</label>
           <input id="searchBox" placeholder="e.g. age predictor" />
           <div class="muted">Search uses the on-chain title-word index. Results are filtered to “listed for sale”.</div>
         </div>
         <div class="row" style="margin-top: 22px;">
-          <button class="btn primary" id="applyBtn">Apply</button>
-          <button class="btn" id="clearBtn">Clear</button>
+          <button type="button" class="btn primary" id="applyBtn">Apply</button>
+          <button type="button" class="btn" id="clearBtn">Clear</button>
         </div>
       </div>
     </div>
@@ -95,13 +98,14 @@ SOFTWARE.
           <span class="pill" id="pagePill">Page</span>
         </div>
         <div class="row">
-          <button class="btn" id="prevBtn">Prev</button>
-          <button class="btn" id="nextBtn">Next</button>
+          <button type="button" class="btn" id="prevBtn">Prev</button>
+          <button type="button" class="btn" id="nextBtn">Next</button>
         </div>
       </div>
       <div class="sep"></div>
       <div class="cards" id="cards"></div>
     </div>
+    </main>
 
   </div>
 

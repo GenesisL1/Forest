@@ -41,6 +41,20 @@ const INT32_SAFE = 2_147_480_000;
 const SEARCH_PAGE_SIZE = 25;
 const PY_UI_SAMPLE_ROWS = 2048;
 
+function setTrainProgress(trainBar, percent) {
+  const value = Math.max(0, Math.min(100, Math.floor(Number(percent) || 0)));
+  if (trainBar) trainBar.style.width = `${value}%`;
+  const progress = trainBar?.parentElement;
+  if (progress?.getAttribute("role") === "progressbar") {
+    progress.setAttribute("aria-valuenow", String(value));
+  }
+}
+
+function announceTraining(message) {
+  const announcer = document.getElementById("trainStatusAnnouncer");
+  if (announcer) announcer.textContent = String(message || "");
+}
+
 
 // ===== Python (local trainer) bridge =====
 // Browser cannot directly launch Python. In "Python engine" mode we call a localhost server:
@@ -197,7 +211,7 @@ async function runTrainRoundPython({ params, round, totalRounds, labelPrefix, pa
   pyTrainAbort = ac;
 
   const overall = (totalRounds > 1) ? ((round - 1) / totalRounds) : 0;
-  trainBar.style.width = `${Math.max(0, Math.min(100, Math.floor(overall * 100)))}%`;
+  setTrainProgress(trainBar, overall * 100);
 
   const headers = parsed?.headers || [];
   const featureCols = (selectedFeatures || []).map((i) => headers[i] || `col${i}`);
@@ -269,7 +283,7 @@ async function runTrainRoundPython({ params, round, totalRounds, labelPrefix, pa
   curve.bestVal = localCurve.bestVal;
 
   const overallDone = (totalRounds > 1) ? (round / totalRounds) : 1;
-  trainBar.style.width = `${Math.max(0, Math.min(100, Math.floor(overallDone * 100)))}%`;
+  setTrainProgress(trainBar, overallDone * 100);
   trainPill.textContent = `${labelTxt} done`;
 
   pyTrainAbort = null;
@@ -4388,6 +4402,7 @@ if (ownerKeyAddr && !ownerKeyAddr.value) {
 
     isTraining = false;
     trainPill.textContent = "Stopped";
+    announceTraining("Training stopped.");
     trainBtn.disabled = false;
     stopBtn.disabled = true;
     setDockState("idle");
@@ -4755,7 +4770,7 @@ if (ownerKeyAddr && !ownerKeyAddr.value) {
           const overall = (totalRounds > 1)
             ? ((round - 1 + inRound) / totalRounds)
             : inRound;
-          trainBar.style.width = `${Math.max(0, Math.min(100, Math.floor(overall * 100)))}%`;
+          setTrainProgress(trainBar, overall * 100);
           trainPill.textContent = `${labelPrefix}… ${msg.done}/${msg.total}`;
 
           const metricName = msg.metricName || msg.metric || (msg.task === "regression" ? "MSE" : "LogLoss");
@@ -5127,8 +5142,9 @@ if (ownerKeyAddr && !ownerKeyAddr.value) {
         searchAbort = false;
         trainBtn.disabled = true;
         stopBtn.disabled = false;
-        trainBar.style.width = "0%";
+        setTrainProgress(trainBar, 0);
         trainPill.textContent = doSearch ? `Search 1/${maxRounds}…` : "Training…";
+        announceTraining(doSearch ? `Training search started with ${maxRounds} rounds.` : "Training started.");
         setDockState("training");
 
         lastTrainInfo = {
@@ -5219,8 +5235,9 @@ if (ownerKeyAddr && !ownerKeyAddr.value) {
 
           applyTrainedModel(finalRes);
 
-          trainBar.style.width = "100%";
+          setTrainProgress(trainBar, 100);
           trainPill.textContent = searchAbort ? `Stopped (best round ${bestRound}/${maxRounds})` : `Done (best round ${bestRound}/${maxRounds}${(finalRes !== best) ? " + refit" : ""})`;
+          announceTraining(searchAbort ? "Training search stopped." : "Training search complete.");
           if (searchAbort) log(`[${nowTs()}] Search stopped by user. Best round=${bestRound}/${maxRounds} bestVal=${bestScore.toFixed(6)}`);
           else log(`[${nowTs()}] Search complete. Best round=${bestRound}/${maxRounds} bestVal=${bestScore.toFixed(6)}${(finalRes !== best) ? " (refit applied)" : ""}`);
 
@@ -5242,8 +5259,9 @@ if (ownerKeyAddr && !ownerKeyAddr.value) {
           }
 
           applyTrainedModel(finalRes);
-          trainBar.style.width = "100%";
+          setTrainProgress(trainBar, 100);
           trainPill.textContent = (finalRes !== res) ? "Done (refit)" : "Done";
+          announceTraining("Training complete.");
           log(`[${nowTs()}] Model ready (${_localEngineName()}). task=${selectedTask} modelId=${trained.modelId} bytes=${trained.bytes.length} features=${trained.decoded.nFeatures} trees=${trained.decoded.nTrees}` + ((finalRes !== res) ? " (refit applied)" : ""));
 
           renderPreviewInputs();
@@ -5396,8 +5414,9 @@ if (ownerKeyAddr && !ownerKeyAddr.value) {
       searchAbort = false;
       trainBtn.disabled = true;
       stopBtn.disabled = false;
-      trainBar.style.width = "0%";
+      setTrainProgress(trainBar, 0);
       trainPill.textContent = doSearch ? `Search 1/${maxRounds}…` : "Training…";
+      announceTraining(doSearch ? `Training search started with ${maxRounds} rounds.` : "Training started.");
       setDockState("training");
 
       // Save training params for post-train feature importance.
@@ -5517,12 +5536,14 @@ if (ownerKeyAddr && !ownerKeyAddr.value) {
 
         applyTrainedModel(finalRes);
 
-        trainBar.style.width = "100%";
+        setTrainProgress(trainBar, 100);
         if (searchAbort) {
           trainPill.textContent = `Stopped (best round ${bestRound}/${maxRounds})`;
+          announceTraining("Training search stopped.");
           log(`[${nowTs()}] Search stopped by user. Best round=${bestRound}/${maxRounds} bestVal=${bestScore.toFixed(6)}`);
         } else {
           trainPill.textContent = refitApplied ? `Done (best round ${bestRound}/${maxRounds} + refit)` : `Done (best round ${bestRound}/${maxRounds})`;
+          announceTraining("Training search complete.");
           log(`[${nowTs()}] Search complete. Best round=${bestRound}/${maxRounds} bestVal=${bestScore.toFixed(6)}${refitApplied ? " (refit applied)" : ""}`);
         }
 
@@ -5557,8 +5578,9 @@ if (ownerKeyAddr && !ownerKeyAddr.value) {
 
         applyTrainedModel(finalRes);
 
-        trainBar.style.width = "100%";
+        setTrainProgress(trainBar, 100);
         trainPill.textContent = (finalRes !== res) ? "Done (refit)" : "Done";
+        announceTraining("Training complete.");
         log(`[${nowTs()}] Model ready. task=${selectedTask} modelId=${trained.modelId} bytes=${trained.bytes.length} features=${trained.decoded.nFeatures} trees=${trained.decoded.nTrees}` + ((finalRes !== res) ? " (refit applied)" : ""));
 
         renderPreviewInputs();
@@ -5576,13 +5598,14 @@ if (ownerKeyAddr && !ownerKeyAddr.value) {
       // IMPORTANT: ensure UI resets even if Worker creation fails.
       const stopped = searchAbort || /stopp/i.test(String(e?.message || ""));
       trainPill.textContent = stopped ? "Stopped" : "Idle";
+      announceTraining(stopped ? "Training stopped." : "Training failed.");
       try { worker?.terminate(); } catch {}
       worker = null;
       isTraining = false;
       isSearching = false;
       trainBtn.disabled = false;
       stopBtn.disabled = true;
-      try { trainBar.style.width = "0%"; } catch {}
+      try { setTrainProgress(trainBar, 0); } catch {}
 
       const msg = e?.message || String(e);
       if (stopped) {

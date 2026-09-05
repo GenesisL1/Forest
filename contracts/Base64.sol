@@ -1,8 +1,17 @@
 // SPDX-License-Identifier: MIT
 /*
+Base64 encoding routine adapted from Brecht Devos's MIT-licensed Base64.sol:
+https://github.com/Brechtpd/base64/blob/e78d9fd951e7b0977ddca77d92dc85183770daf4/base64.sol
+
+The GL1F copy keeps only encoding, uses bytes for the lookup table, emits four
+characters per word, and opts into Solidity memory-safe assembly. See
+THIRD_PARTY_NOTICES.md for the upstream attribution and licence boundary.
+*/
+/*
 MIT License
 
-Copyright (c) 2026 Decentralized Science Labs
+Copyright (c) 2021 Brecht Devos
+Copyright (c) 2026 Decentralized Science Labs (GL1F modifications)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

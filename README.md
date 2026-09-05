@@ -23,24 +23,43 @@ SOFTWARE.
 -->
 
 # GenesisL1 Forest (GL1F)
-Link: https://GL1F.com
+Website: <https://gl1f.com>
 
-A browser-only studio for:
-- training GBDT models (in-browser): regression + binary + multiclass + multilabel classification
-- deploying models on GenesisL1 as ERC-721 Model NFTs
-- on-chain inference (view call + optional paid tx)
-- AI store listing/buying
-- on-chain Terms + Creative Commons license enforcement
-- on-chain title-word search index
+A browser studio and command-line toolchain for:
+
+- training GBDT models for regression, binary, multiclass, and multilabel tasks;
+- serializing models into the canonical GL1F format;
+- publishing model bytes on GenesisL1 with custom transferable,
+  ERC-721-like ownership records;
+- local or EVM integer inference; and
+- optional marketplace discovery and paid contract calls.
+
+## Research paper v0.2.3
+
+The canonical [research paper](GL1F.pdf) is a single-column technical report
+released on 5 September 2026. It has not been peer reviewed. The
+[reproducibility guide](REPRODUCIBILITY.md), [format specification](FORMAT_SPEC.md),
+tests, and checked-in result records define the public evidence boundary.
+
+Version 0.2.3 does not change or redeploy any contract.
+
+```bash
+npm ci
+make verify
+```
 
 ## Run locally
-You must serve this folder over HTTP (not file://) so module imports work.
 
-### Option A: Python
+Serve this folder over HTTP (not `file://`) so module imports work.
+
+### Python
+
 ```bash
 python3 -m http.server 8080
 ```
+
 Open:
+
 - http://localhost:8080/
 - http://localhost:8080/forest.html
 
@@ -1134,13 +1153,13 @@ The `.gl1f` output may include a `GL1X` footer with local training metadata. Tha
 
 ---
 
-# Headless minting — `model_mint.py`
+# Headless minting — `mint_model.py`
 
-`model_mint.py` (repo root) is the **command-line equivalent of the Forest studio's Mint tab**. It mirrors the browser/MetaMask flow byte-for-byte, but signs every transaction with a private key from `.env` — so a large model that would otherwise require hundreds of MetaMask confirmations can be deployed unattended in a single run.
+`mint_model.py` (repo root) is the **command-line equivalent of the Forest studio's Mint tab**. It mirrors the browser/MetaMask flow byte-for-byte, but signs every transaction with a private key from `.env` — so a large model that would otherwise require hundreds of MetaMask confirmations can be deployed unattended in a single run.
 
 It is the right tool when:
 - **The model is large** (hundreds of KB to several MB), where the browser path means clicking through 100–600+ MetaMask popups.
-- **You need reproducible paper artifacts** — every run emits `S1.json` (Supplementary Table S1) with every on-chain identifier needed to cite the deployment.
+- **You need a machine-readable deployment record** — every completed run emits `S1.json` with the model digest, contract pointers, transaction identifiers, and recorded settings.
 - **The mint may be interrupted** — `mint_state.json` allows resumption from the last completed chunk.
 - **You want a pre-flight check** — `--dry-run` validates the whole flow without sending any transaction.
 
@@ -1154,7 +1173,7 @@ The script replicates `src/create_page.js` (the `deployBtn` handler) exactly:
 4. **Chunk-deploy the model**: split the core into `CHUNK_SIZE = 24000`-byte chunks. For each chunk:
    - call `store.write(chunk)` → wait for receipt → parse `ChunkWritten` event → record the chunk-contract pointer.
 5. **Build the pointer table**: 32 bytes per chunk pointer (right-aligned in the slot, padding zeros on the left), then `store.write(table)` to deploy it.
-6. **Register the model**: a single `registry.registerModel(...)` call (payable, value = `requiredDeployFeeWei`) which also mints the ERC-721 Model NFT.
+6. **Register the model**: a single `registry.registerModel(...)` call (payable, value = `requiredDeployFeeWei`) which also mints the custom transferable model token.
 7. **Emit artifacts** (see below).
 
 One transaction per block, sequentially — same ordering as the UI. No batching, no parallel sending.
@@ -1216,9 +1235,12 @@ Three files written to the current working directory:
 |---|---|
 | `mint_state.json` | Per-chunk progress: pointer for each completed chunk, table pointer, register-tx hash. Used by `--resume`. **Do not delete mid-mint.** |
 | `owner_key.txt` | Freshly-generated owner API keypair. Required for off-chain ownership operations on the model. **Back this up immediately** — it is not recoverable. |
-| `S1.json` | **Supplementary Table S1.** Every on-chain identifier of the deployment: `modelId`, `tokenId`, all chunk pointers, table pointer, register-tx hash + block number, deployer address, owner-key address, model header fields, SHA-256 of the core bytes, `licenseIdAccepted`, `tosVersionAccepted`, pricing config, chain id, RPC, feature names. Designed to be cited verbatim in a paper. |
+| `S1.json` | Machine-readable deployment record containing `modelId`, `tokenId`, chunk pointers, table pointer, register-transaction hash and block number, deployer address, owner-key address, model header fields, core SHA-256, accepted license and ToS identifiers, pricing configuration, chain ID, RPC label, and feature names. |
 
-`S1.json` is the canonical reproducibility witness: anyone with the file can independently verify that the same `.gl1f` (matching `core_sha256` and `model_id`) was deployed to the exact contracts on chainId 29.
+`S1.json` supplies the identifiers and digests needed to compare a local
+`.gl1f` core and query the referenced receipts and contract state. The file is
+a record produced by the client; it is not, by itself, proof of the chain
+claims it contains.
 
 ## Reliability
 
@@ -1233,7 +1255,7 @@ Three files written to the current working directory:
 ### Mint a `.gl1f` with a `GL1X` footer (typical case)
 
 ```bash
-python model_mint.py --gl1f path/to/model.gl1f
+python mint_model.py --gl1f path/to/model.gl1f
 ```
 
 Task, feature names, label name, and optional title/description/icon are auto-extracted from the footer. Only fee and license-acceptance prompts remain.
@@ -1241,7 +1263,7 @@ Task, feature names, label name, and optional title/description/icon are auto-ex
 ### Mint a paid-inference model
 
 ```bash
-python model_mint.py \
+python mint_model.py \
     --gl1f path/to/model.gl1f \
     --pricing-mode 2 \
     --pricing-fee-eth 0.005 \
@@ -1251,7 +1273,7 @@ python model_mint.py \
 ### Resume an interrupted mint
 
 ```bash
-python model_mint.py --gl1f path/to/model.gl1f --resume
+python mint_model.py --gl1f path/to/model.gl1f --resume
 ```
 
 Reads `mint_state.json` in cwd, skips chunks whose pointers are already recorded, and picks up at the first missing chunk.
@@ -1259,7 +1281,7 @@ Reads `mint_state.json` in cwd, skips chunks whose pointers are already recorded
 ### Dry run (CI / pre-flight)
 
 ```bash
-python model_mint.py --gl1f path/to/model.gl1f --dry-run
+python mint_model.py --gl1f path/to/model.gl1f --dry-run
 ```
 
 Reads the model, computes `modelId`, validates the icon and metadata, reads registry state, encodes every transaction — but sends none. Use this to confirm a model is mintable before paying gas.
@@ -1267,7 +1289,7 @@ Reads the model, computes `modelId`, validates the icon and metadata, reads regi
 ### Footerless model with explicit metadata
 
 ```bash
-python model_mint.py \
+python mint_model.py \
     --gl1f path/to/legacy.gl1f \
     --task binary_classification \
     --label-name will_break_resistance \
@@ -1296,4 +1318,7 @@ All override-able via `--store-addr` / `--registry-addr` / `--nft-addr`.
 
 ## License
 
-This project is released under the MIT License. See the `LICENSE` file for details.
+Original GL1F software is released under the MIT License. See
+[`LICENSE`](LICENSE). Third-party and separately licensed material retains its
+upstream terms; see
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).

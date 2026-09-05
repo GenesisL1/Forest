@@ -187,8 +187,10 @@ function softmaxProbs(predQ, nRows, nClasses, scaleQ, outProb) {
       outProb[base + k] = e;
       sum += e;
     }
-    const inv = 1 / (sum || 1);
-    for (let k = 0; k < nClasses; k++) outProb[base + k] *= inv;
+    const denominator = sum || 1;
+    for (let k = 0; k < nClasses; k++) {
+      outProb[base + k] = outProb[base + k] / denominator;
+    }
   }
 }
 
@@ -435,7 +437,6 @@ function buildTreeRegression({
       cnt.fill(0); sum.fill(0); sum2.fill(0);
 
       const minF = featMin[f];
-      const inv = 1 / range;
 
       let totalCount = 0;
       let totalSum = 0;
@@ -457,7 +458,9 @@ function buildTreeRegression({
           }
           b = lo;
         } else {
-          b = Math.floor(((x - minF) * inv) * BINS);
+          // Operation order is parity-critical at IEEE-754 bin boundaries:
+          // Python/C++ divide by range directly rather than multiply by its reciprocal.
+          b = Math.floor(((x - minF) / range) * BINS);
           if (b < 0) b = 0;
           else if (b >= BINS) b = BINS - 1;
         }
@@ -598,7 +601,6 @@ function buildTreeBinary({
 
       cnt.fill(0); sumG.fill(0); sumH.fill(0);
       const minF = featMin[f];
-      const inv = 1 / range;
 
       let totalCount = 0;
       let totalG = 0;
@@ -618,7 +620,8 @@ function buildTreeBinary({
           }
           b = lo;
         } else {
-          b = Math.floor(((x - minF) * inv) * BINS);
+          // Keep the exact divide-then-multiply order used by Python/C++.
+          b = Math.floor(((x - minF) / range) * BINS);
           if (b < 0) b = 0;
           else if (b >= BINS) b = BINS - 1;
         }
@@ -707,7 +710,11 @@ self.onmessage = async (ev) => {
     const depth = Math.max(1, p.depth | 0);
     const lrBase = Number(p.lr ?? 0.05);
     const minLeaf = Math.max(1, p.minLeaf | 0);
-    const seed = (p.seed | 0) || 42;
+    const seedValue = Number(p.seed);
+    // Preserve an explicit zero: xorshift32 applies the shared nonzero-state
+    // fallback (123456789), matching Python and C++. Only a missing/invalid
+    // parameter selects the UI default seed.
+    const seed = (p.seed == null || !Number.isFinite(seedValue)) ? 42 : (seedValue | 0);
     const earlyStop = !!p.earlyStop;
     const patience = Math.max(1, p.patience | 0);
     const scaleQ = Math.max(1, p.scaleQ | 0);

@@ -1,0 +1,436 @@
+<!--
+MIT License
+
+Copyright (c) 2026 Decentralized Science Labs
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+-->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="description" content="GL1F v0.2.3 public research paper, reproducibility protocol, formal results, benchmarks, and scoped GenesisL1 deployment evidence." />
+  <meta name="keywords" content="GL1F, GenesisL1, deterministic machine learning, gradient-boosted trees, EVM inference, reproducible computing, DeSci" />
+  <meta name="author" content="Mikhail Fedorov" />
+  <meta name="version" content="0.2.3" />
+  <meta name="citation_title" content="Artifact-to-Execution Assurance for Canonical Integer GBDTs on the EVM" />
+  <meta name="citation_author" content="Mikhail Fedorov" />
+  <meta name="citation_publication_date" content="2026-09-05" />
+  <meta name="citation_pdf_url" content="https://gl1f.com/GL1F.pdf" />
+  <meta name="robots" content="index,follow" />
+  <meta name="theme-color" content="#f8fafc" />
+
+  <meta property="og:title" content="GL1F Research — Artifact-to-Execution Assurance" />
+  <meta property="og:description" content="GL1F v0.2.3 public research paper, source, proofs, and scoped evaluation evidence. Not peer reviewed." />
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="GenesisL1 Forest" />
+  <meta property="og:url" content="https://gl1f.com/research.html" />
+  <meta property="og:image" content="https://genesisl1.com/logo.svg" />
+
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="GL1F Research — Artifact-to-Execution Assurance" />
+  <meta name="twitter:description" content="GL1F v0.2.3 public research paper, source, proofs, and scoped evaluation evidence. Not peer reviewed." />
+  <meta name="twitter:image" content="https://genesisl1.com/logo.svg" />
+
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "TechArticle",
+      "headline": "Artifact-to-Execution Assurance for Canonical Integer GBDTs on the EVM",
+      "datePublished": "2026-09-05",
+      "dateModified": "2026-09-05",
+      "version": "0.2.3",
+      "creativeWorkStatus": "Public technical report; not peer reviewed",
+      "author": {
+        "@type": "Person",
+        "name": "Mikhail Fedorov"
+      },
+      "url": "https://gl1f.com/research.html",
+      "sameAs": "https://gl1f.com/GL1F.pdf",
+      "isBasedOn": {
+        "@type": "SoftwareSourceCode",
+        "name": "GenesisL1 Forest",
+        "version": "0.2.3",
+        "codeRepository": "https://github.com/GenesisL1/Forest",
+        "license": "https://opensource.org/license/mit",
+        "programmingLanguage": ["JavaScript", "Python", "C++", "Solidity"]
+      },
+      "about": [
+        "gradient-boosted decision trees",
+        "deterministic inference",
+        "Ethereum Virtual Machine",
+        "reproducible computing"
+      ]
+    }
+  </script>
+
+  <title>GL1F Research v0.2.3 — Paper and Reproducibility</title>
+  <link rel="canonical" href="https://gl1f.com/research.html" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="preconnect" href="https://genesisl1.com" crossorigin />
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body class="page-research">
+  <a class="skip-link" href="#main">Skip to research record</a>
+
+  <div class="container">
+    <header class="topbar">
+      <a class="brand" href="./index.html" aria-label="GenesisL1 Forest home">
+        <img src="https://genesisl1.com/logo.svg" alt="" width="28" height="28" />
+        <span>GenesisL1 Forest</span>
+      </a>
+      <button class="btn navToggle" type="button" aria-label="Open menu" aria-controls="siteNav" aria-expanded="false">
+        <span class="navToggleIcon" aria-hidden="true"></span>
+      </button>
+      <nav class="nav" id="siteNav" aria-label="Primary navigation">
+        <a class="btn ghost small" href="./forest.html">Models</a>
+        <a class="btn ghost small" href="./create.html">Studio</a>
+        <a class="btn ghost small" href="./aistore.html">Marketplace</a>
+        <a class="btn ghost small primary" aria-current="page" href="./research.html">Research</a>
+        <a class="btn ghost small" href="./FORMAT_SPEC.md">Format specification</a>
+        <a class="btn primary small" href="https://github.com/GenesisL1/Forest" target="_blank" rel="noopener noreferrer">Source code</a>
+      </nav>
+    </header>
+
+    <main id="main">
+      <section class="research-hero" aria-labelledby="research-title">
+        <div class="research-kicker">
+          <span class="status-dot" aria-hidden="true"></span>
+          Public technical report v0.2.3 · Not peer reviewed
+        </div>
+        <h1 id="research-title">Artifact-to-execution assurance for canonical integer GBDTs</h1>
+        <p class="research-lead">
+          GL1F serializes integer-quantized gradient-boosted trees into a
+          canonical binary form that can be reconstructed from chain state and
+          evaluated through Solidity, JavaScript, Python, and C++. The protocol
+          intentionally publishes its model bytes, and its claims are
+          classified by proof, executable evidence, benchmark, or explicit
+          scope statement.
+        </p>
+        <div class="research-actions" aria-label="Research documents">
+          <a class="btn primary" href="./GL1F.pdf">Read the paper</a>
+          <a class="btn" href="./paper/GL1F_Formal_Supplement.pdf">Formal supplement</a>
+          <a class="btn" href="./REPRODUCIBILITY.md">Verification guide</a>
+          <a class="btn" href="https://github.com/GenesisL1/Forest" target="_blank" rel="noopener noreferrer">v0.2.3 source</a>
+        </div>
+        <div class="research-tags" aria-label="Protocol attributes">
+          <span>Canonical GL1F format</span>
+          <span>Integer EVM traversal</span>
+          <span>Public model bytes</span>
+          <span>Released 5 September 2026</span>
+          <span>Software: MIT</span>
+        </div>
+      </section>
+
+      <section class="evidence-strip" aria-labelledby="evidence-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Number-pinned provider observation</p>
+            <h2 id="evidence-title">A research record with documented scope and verification paths</h2>
+          </div>
+          <p class="record-state" id="evidenceState" role="status">Recorded provider summary</p>
+        </div>
+
+        <div class="research-metrics">
+          <article class="metric-card">
+            <span class="metric-value" id="activeModels">12</span>
+            <span class="metric-label">active model records</span>
+          </article>
+          <article class="metric-card">
+            <span class="metric-value" id="totalBytes">31.19 MB</span>
+            <span class="metric-label">model bytes reconstructed</span>
+          </article>
+          <article class="metric-card">
+            <span class="metric-value" id="exactMatches">108 / 108</span>
+            <span class="metric-label">matching local/provider-call results</span>
+          </article>
+          <article class="metric-card">
+            <span class="metric-value" id="witnessBlock">13,342,043</span>
+            <span class="metric-label">number-pinned provider block</span>
+          </article>
+        </div>
+
+        <div class="block-record">
+          <div>
+            <span class="record-label">Reported block hash</span>
+            <code id="blockHash">0xffd825db1bb2534052a604db9584d361111d8bc9e19d753b0ee3861bf320d1b9</code>
+          </div>
+          <div class="record-links">
+            <a href="./benchmarks/results/LIVE_CHAIN_WITNESS_EXTENDED_V2.md">Historical summary</a>
+            <a href="./REPRODUCIBILITY.md">Verification guide</a>
+            <a href="./docs/DEPLOYED_SYSTEM.md">Deployment notes</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="research-section" aria-labelledby="contribution-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Technical contribution</p>
+            <h2 id="contribution-title">One artifact, four execution surfaces</h2>
+          </div>
+          <a class="text-link" href="./docs/ARCHITECTURE.md">Architecture document →</a>
+        </div>
+
+        <div class="architecture-flow" aria-label="GL1F system architecture">
+          <article>
+            <span class="flow-index">01</span>
+            <h3>Construct</h3>
+            <p>Browser, Python, or C++ training produces fixed-depth trees and an explicit quantization scale.</p>
+          </article>
+          <span class="flow-arrow" aria-hidden="true">→</span>
+          <article>
+            <span class="flow-index">02</span>
+            <h3>Serialize</h3>
+            <p>A strict GL1F core defines headers, thresholds, leaves, output dimensions, and deterministic traversal.</p>
+          </article>
+          <span class="flow-arrow" aria-hidden="true">→</span>
+          <article>
+            <span class="flow-index">03</span>
+            <h3>Publish</h3>
+            <p>Immutable GL1C code chunks and a registry manifest make the public artifact reconstructable.</p>
+          </article>
+          <span class="flow-arrow" aria-hidden="true">→</span>
+          <article>
+            <span class="flow-index">04</span>
+            <h3>Reevaluate</h3>
+            <p>The EVM and local runtimes traverse the same integer model and can be compared output-for-output.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="research-section" aria-labelledby="claims-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Claim discipline</p>
+            <h2 id="claims-title">What the evidence establishes</h2>
+          </div>
+          <a class="text-link" href="./paper/GL1F_Formal_Supplement.pdf">Formal supplement →</a>
+        </div>
+
+        <div class="boundary-grid">
+          <article class="boundary-card established">
+            <div class="boundary-mark" aria-hidden="true">✓</div>
+            <div>
+              <h3>Established within stated conditions</h3>
+              <ul>
+                <li>Canonical v1 and v2 byte layouts have exact finite sizes.</li>
+                <li>Valid fixed-depth traversal terminates and selects one leaf per tree.</li>
+                <li>Specification-level integer inference is equivalent under the stated reconstruction and execution premises.</li>
+                <li>Twenty-five distinct recorded training profiles produced identical JavaScript, Python, and C++ cores; a separate arithmetic witness exercises the operation-order boundary.</li>
+                <li>The six-shape scalar EVM sweep produced 72/72 exact reference/runtime outputs.</li>
+                <li>All 12 active records at the pinned block passed the documented reconstruction checks.</li>
+                <li>For the pinned provider-attested record, nine deterministic vectors per active model yielded 108/108 matching local and returned call results.</li>
+              </ul>
+            </div>
+          </article>
+
+          <article class="boundary-card limited">
+            <div class="boundary-mark" aria-hidden="true">≠</div>
+            <div>
+              <h3>Not established by the protocol</h3>
+              <ul>
+                <li>Predictive accuracy or generalization on an unspecified dataset.</li>
+                <li>Truth, provenance, causality, authorship, fairness, or safety of a model.</li>
+                <li>Confidentiality of published weights or exclusive local inference.</li>
+                <li>Consensus finality for an unpinned <code>eth_call</code> response.</li>
+                <li>Integrity of every future registry entry without independent validation.</li>
+              </ul>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="research-section deployment-section" aria-labelledby="deployment-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Operational deployment</p>
+            <h2 id="deployment-title">The contracts are deployed; the UI is live</h2>
+          </div>
+          <a class="text-link" href="./deployments/genesisl1.json">JSON manifest →</a>
+        </div>
+
+        <p class="section-intro">
+          The table records the GenesisL1 addresses used by the live browser
+          application. Contract-source improvements do not alter deployed
+          bytecode or these addresses unless a later manifest explicitly
+          records a new deployment.
+        </p>
+
+        <div class="deployment-table-wrap">
+          <table class="deployment-table">
+            <thead>
+              <tr>
+                <th scope="col">Component</th>
+                <th scope="col">Address</th>
+                <th scope="col">Observed runtime</th>
+                <th scope="col">Role</th>
+              </tr>
+            </thead>
+            <tbody id="deploymentBody">
+              <tr>
+                <th scope="row">ModelStore</th>
+                <td><code>0x9CdbC23392648Bd27B4A5eD09c0fEa9452454B54</code></td>
+                <td>714 bytes</td>
+                <td>Immutable GL1C chunks</td>
+              </tr>
+              <tr>
+                <th scope="row">ModelRegistry</th>
+                <td><code>0x33c9844F77a07e36B98f0FFf8201B8A8b02c2a69</code></td>
+                <td>12,725 bytes</td>
+                <td>Manifest and model settings</td>
+              </tr>
+              <tr>
+                <th scope="row">ModelNFT</th>
+                <td><code>0x44Dc1c54B8D579B42d78cC21cf8260DC0A3279fA</code></td>
+                <td>5,968 bytes</td>
+                <td>Custom transferable model-token records</td>
+              </tr>
+              <tr>
+                <th scope="row">ForestRuntime</th>
+                <td><code>0xD2fD0cf461a6cb56Fc08d9aEc120833D8E79044E</code></td>
+                <td>17,794 bytes</td>
+                <td>Integer model execution</td>
+              </tr>
+              <tr>
+                <th scope="row">ModelMarketplace</th>
+                <td><code>0xA9bfa0a719b7F73cE85CA1E7f23af626D383fB46</code></td>
+                <td>3,828 bytes</td>
+                <td>Model-token settlement</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="table-note" id="manifestNote">
+          Runtime sizes and dual code digests were observed at block
+          13,342,043. They identify deployed bytes, but do not assert that
+          local source builds reproduce them byte-for-byte.
+        </p>
+      </section>
+
+      <section class="research-section" aria-labelledby="reproduce-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Verification resources</p>
+            <h2 id="reproduce-title">Inspect the released methods and evidence</h2>
+          </div>
+          <a class="text-link" href="https://github.com/GenesisL1/Forest" target="_blank" rel="noopener noreferrer">Open repository →</a>
+        </div>
+
+        <div class="reproduce-grid">
+          <div class="code-card">
+            <div class="code-card-head">
+              <span>Run the verification suite</span>
+              <button class="copy-command" type="button" data-copy="npm ci&#10;make verify">Copy</button>
+            </div>
+            <pre><code>npm ci
+make verify</code></pre>
+          </div>
+          <div class="code-card">
+            <div class="code-card-head">
+              <span>Run publication-profile tests</span>
+              <button class="copy-command" type="button" data-copy="python3 -m unittest -v tests.publication.test_publication">Copy</button>
+            </div>
+            <pre><code>python3 -m unittest -v \
+tests.publication.test_publication</code></pre>
+          </div>
+          <div class="code-card">
+            <div class="code-card-head">
+              <span>Check the static research UI</span>
+              <button class="copy-command" type="button" data-copy="python3 tests/ui_static_check.py">Copy</button>
+            </div>
+            <pre><code>python3 tests/ui_static_check.py</code></pre>
+          </div>
+          <div class="code-card">
+            <div class="code-card-head">
+              <span>Run the local EVM scaling benchmark</span>
+              <button class="copy-command" type="button" data-copy="npm run benchmark:evm">Copy</button>
+            </div>
+            <pre><code>npm run benchmark:evm</code></pre>
+          </div>
+        </div>
+
+        <div class="document-grid">
+          <a href="./GL1F.pdf">
+            <span class="document-type">PDF</span>
+            <strong>Research paper</strong>
+            <small>Problem formulation, system design, formal results, and evaluation.</small>
+          </a>
+          <a href="./paper/GL1F_Formal_Supplement.pdf">
+            <span class="document-type">PDF</span>
+            <strong>Formal supplement</strong>
+            <small>Definitions, propositions, correctness arguments, and proof boundaries.</small>
+          </a>
+          <a href="./REPRODUCIBILITY.md">
+            <span class="document-type">GUIDE</span>
+            <strong>Reproducibility protocol</strong>
+            <small>Environment, commands, fixtures, chain pinning, expected results, and interpretation.</small>
+          </a>
+          <a href="./FORMAT_SPEC.md">
+            <span class="document-type">SPEC</span>
+            <strong>Binary format</strong>
+            <small>Normative GL1F, GL1C, and GL1X structure and validation rules.</small>
+          </a>
+          <a href="./docs/ON_CHAIN_API.md">
+            <span class="document-type">API</span>
+            <strong>On-chain interface</strong>
+            <small>Feature packing, registry reads, inference functions, and evidence semantics.</small>
+          </a>
+          <a href="./CITATION.cff">
+            <span class="document-type">CITE</span>
+            <strong>Citation metadata</strong>
+            <small>Machine-readable software and paper citation information.</small>
+          </a>
+        </div>
+      </section>
+
+      <aside class="protocol-boundary" aria-labelledby="boundary-title">
+        <div>
+          <p class="eyebrow">Protocol boundary</p>
+          <h2 id="boundary-title">Open by design. Reconstructible by specification.</h2>
+        </div>
+        <p>
+          Published model bytes are intentionally readable so anyone can
+          reconstruct and reevaluate them. Optional service paths do not create
+          weight confidentiality. Exact execution identity is distinct from
+          model accuracy, dataset provenance, and application fitness.
+        </p>
+      </aside>
+    </main>
+
+    <footer class="research-footer">
+      <div>
+        <strong>GL1F · GenesisL1 Forest</strong>
+        <span>Open deterministic model infrastructure</span>
+      </div>
+      <div>
+        <a href="./LICENSE">Software: MIT</a>
+        <a href="https://github.com/GenesisL1/Forest" target="_blank" rel="noopener noreferrer">Source v0.2.3</a>
+        <a href="./CITATION.cff">Cite</a>
+        <a href="./terms.html">Protocol terms</a>
+      </div>
+    </footer>
+  </div>
+
+  <script type="module" src="./src/research_page.js"></script>
+</body>
+</html>

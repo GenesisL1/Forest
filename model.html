@@ -50,7 +50,9 @@ SOFTWARE.
 <title>GenesisL1 Forest — Model Details & Inference</title>
   <link rel="icon" href="data:," />
   <link rel="stylesheet" href="./style.css" />
-  <script src="https://cdn.jsdelivr.net/npm/ethers@6.12.1/dist/ethers.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.12.1/dist/ethers.umd.min.js"
+    integrity="sha384-ZE/wK5p9CtYydQ2IWO7H7mb0024vP3kJ1eOG7JD9+UA/0VBGZeYIxtttlh93VoK7"
+    crossorigin="anonymous"></script>
 </head>
 <body>
   <div class="container">
@@ -60,17 +62,18 @@ SOFTWARE.
        <img src="https://genesisl1.com/logo.svg" alt="GenesisL1" style="width:28px; height:28px;" /> GenesisL1 Forest </a>
       </div>
       <button class="btn navToggle" type="button" aria-label="Menu" aria-controls="siteNav" aria-expanded="false"><span class="navToggleIcon" aria-hidden="true"></span></button>
-      <div class="nav" id="siteNav" aria-label="Primary navigation">
+      <nav class="nav" id="siteNav" aria-label="Primary navigation">
         <a class="btn ghost" data-nav="forest" href="./forest.html">AI Models</a>
         <a class="btn ghost" data-nav="market" href="./aistore.html">AI Store</a>
         <a class="btn ghost" data-nav="create" href="./create.html">Create</a>
         <a class="btn ghost" data-nav="my" href="./my.html">My Models</a>
         <a class="btn ghost" data-nav="terms" href="./terms.html">Terms</a>
         <span class="pill" id="walletPill">Read-only (RPC)</span>
-        <button class="btn primary" id="connectBtn">Connect Wallet</button>
-      </div>
+        <button type="button" class="btn primary" id="connectBtn">Connect Wallet</button>
+      </nav>
     </div>
 
+    <main id="main">
     <div class="hero" id="hero">
       <h1 id="title">Model</h1>
       <p class="muted" id="desc">Loading…</p>
@@ -92,6 +95,25 @@ SOFTWARE.
 
         <div class="sep"></div>
 
+        <h3>Independent content verification</h3>
+        <p class="muted">
+          Reconstruct the registered GL1C chunks, require
+          <span class="mono">keccak256(core) = modelId</span>, and reconcile the
+          canonical GL1F header with the current chain-29 registry state.
+          This is an opt-in read-only check because large models require many
+          RPC code reads.
+        </p>
+        <div class="row" style="align-items:center; flex-wrap:wrap;">
+          <button type="button" class="btn" id="verifyCoreBtn" disabled>
+            Verify registered model bytes
+          </button>
+          <span class="muted" id="verifyCoreStatus" role="status" aria-live="polite">
+            Loading model metadata…
+          </span>
+        </div>
+
+        <div class="sep"></div>
+
         <div class="muted">
           Creator: <a class="mono" id="creatorLink" href="./forest.html" style="text-decoration: none;">—</a><br/>
           Owner: <a class="mono" id="ownerAddrLink" href="./forest.html" style="text-decoration: none;">—</a>
@@ -106,7 +128,7 @@ SOFTWARE.
         <div class="sep"></div>
 
         <div class="row">
-          <button class="btn" id="refreshBtn">Refresh</button>
+          <button type="button" class="btn" id="refreshBtn">Refresh</button>
           <a class="btn" id="ownerLink" href="./forest.html">View owner’s models</a>
         </div>
       </div>
@@ -124,15 +146,15 @@ SOFTWARE.
         <div class="sep"></div>
 
         <div class="row" style="flex-wrap: wrap;">
-          <button class="btn primary" id="callBtn">Run (read call)</button>
+          <button type="button" class="btn primary" id="callBtn">Run (read call)</button>
 
           <div id="txBox" style="display:none; flex: 1; min-width: 260px;">
-            <label>Tip / Payment (L1)</label>
+            <label for="payAmt">Tip / Payment (L1)</label>
             <input type="number" step="0.001" id="payAmt" value="0.001" />
             <div class="muted" id="payHint"></div>
           </div>
 
-          <button class="btn" id="txBtn" style="display:none;">Run (transaction)</button>
+          <button type="button" class="btn" id="txBtn" style="display:none;">Run (transaction)</button>
         </div>
 
         <div class="sep"></div>
@@ -159,23 +181,23 @@ SOFTWARE.
         <h3>Buy access</h3>
         <div class="row" style="align-items:flex-end;">
           <div style="flex:1">
-            <label>Plan</label>
+            <label for="planSelect">Plan</label>
             <select id="planSelect"></select>
           </div>
           <div style="flex:1">
-            <label>API key address</label>
+            <label for="buyerKeyAddr">API key address</label>
             <input id="buyerKeyAddr" placeholder="0x…" />
           </div>
-          <button id="genBuyerKeyBtn" class="btn small">Generate key</button>
+          <button type="button" id="genBuyerKeyBtn" class="btn small">Generate key</button>
         </div>
 
         <div class="row" style="align-items:flex-end; margin-top:12px;">
           <div style="flex:1">
-            <label>Private key (save it)</label>
+            <label for="buyerKeyPriv">Private key (save it)</label>
             <input id="buyerKeyPriv" type="password" placeholder="0x…" />
           </div>
-          <button id="copyBuyerKeyBtn" class="btn small">Copy</button>
-          <button id="buyPlanBtn" class="btn primary">Buy</button>
+          <button type="button" id="copyBuyerKeyBtn" class="btn small">Copy</button>
+          <button type="button" id="buyPlanBtn" class="btn primary">Buy</button>
         </div>
 
         <div class="muted" id="expiryInfo" style="margin-top:10px;"></div>
@@ -187,44 +209,44 @@ SOFTWARE.
         <h3>Owner: create / update plans</h3>
         <div class="row" style="align-items:flex-end;">
           <div style="flex:1">
-            <label>Duration (blocks)</label>
+            <label for="planDuration">Duration (blocks)</label>
             <input id="planDuration" placeholder="e.g. 40320 (≈ 7 days @ 15s blocks)" />
           </div>
           <div style="flex:1">
-            <label>Price (L1)</label>
+            <label for="planPrice">Price (L1)</label>
             <input id="planPrice" placeholder="e.g. 10" />
           </div>
           <div style="flex:0.6">
-            <label>Active</label>
+            <label for="planActive">Active</label>
             <select id="planActive">
               <option value="1">Yes</option>
               <option value="0">No</option>
             </select>
           </div>
-          <button id="createPlanBtn" class="btn">Create plan</button>
+          <button type="button" id="createPlanBtn" class="btn">Create plan</button>
         </div>
 
         <div class="row" style="align-items:flex-end; margin-top:12px;">
           <div style="flex:0.6">
-            <label>Plan ID</label>
+            <label for="editPlanId">Plan ID</label>
             <input id="editPlanId" placeholder="1" />
           </div>
           <div style="flex:1">
-            <label>New duration (blocks)</label>
+            <label for="editPlanDuration">New duration (blocks)</label>
             <input id="editPlanDuration" placeholder="40320" />
           </div>
           <div style="flex:1">
-            <label>New price (L1)</label>
+            <label for="editPlanPrice">New price (L1)</label>
             <input id="editPlanPrice" placeholder="10" />
           </div>
           <div style="flex:0.6">
-            <label>Active</label>
+            <label for="editPlanActive">Active</label>
             <select id="editPlanActive">
               <option value="1">Yes</option>
               <option value="0">No</option>
             </select>
           </div>
-          <button id="setPlanBtn" class="btn">Update plan</button>
+          <button type="button" id="setPlanBtn" class="btn">Update plan</button>
         </div>
 
         <div class="sep"></div>
@@ -232,18 +254,18 @@ SOFTWARE.
         <h3>Owner: perpetual key</h3>
         <div class="row" style="align-items:flex-end;">
           <div style="flex:1">
-            <label>Key address</label>
+            <label for="ownerSetKeyAddr">Key address</label>
             <input id="ownerSetKeyAddr" placeholder="0x…" />
           </div>
-          <button id="setOwnerKeyBtn" class="btn">Grant perpetual access</button>
-          <button id="genOwnerKey2Btn" class="btn small">Generate new key</button>
+          <button type="button" id="setOwnerKeyBtn" class="btn">Grant perpetual access</button>
+          <button type="button" id="genOwnerKey2Btn" class="btn small">Generate new key</button>
         </div>
         <div class="row" style="align-items:flex-end; margin-top:12px;">
           <div style="flex:1">
-            <label>Generated private key (save it)</label>
+            <label for="ownerKey2Priv">Generated private key (save it)</label>
             <input id="ownerKey2Priv" type="password" placeholder="0x…" />
           </div>
-          <button id="copyOwnerKey2Btn" class="btn small">Copy</button>
+          <button type="button" id="copyOwnerKey2Btn" class="btn small">Copy</button>
         </div>
       </div>
 
@@ -256,10 +278,10 @@ SOFTWARE.
         </div>
         <div class="row" style="align-items:flex-end; margin-top:12px;">
           <div style="flex:1">
-            <label>API key private key</label>
+            <label for="keyPriv">API key private key</label>
             <input id="keyPriv" type="password" placeholder="0x…" />
           </div>
-          <button id="keyCallBtn" class="btn primary">Predict via key</button>
+          <button type="button" id="keyCallBtn" class="btn primary">Predict via key</button>
         </div>
       </div>
     </div>
@@ -275,18 +297,18 @@ SOFTWARE.
           <div class="sep"></div>
 
           <div id="ownerMarketBox" style="display:none;">
-            <label>List price (L1)</label>
+            <label for="listPrice">List price (L1)</label>
             <input id="listPrice" type="number" step="0.001" value="1" />
             <div class="row" style="margin-top: 12px;">
-              <button class="btn primary" id="listBtn">List for sale</button>
-              <button class="btn" id="cancelBtn">Cancel listing</button>
+              <button type="button" class="btn primary" id="listBtn">List for sale</button>
+              <button type="button" class="btn" id="cancelBtn">Cancel listing</button>
             </div>
             <div class="muted" style="margin-top: 10px;">Listing creates an on-chain sale offer. Buying transfers the NFT.</div>
           </div>
 
           <div id="buyBox" style="display:none;">
             <div class="row">
-              <button class="btn primary" id="buyBtn">Buy now</button>
+              <button type="button" class="btn primary" id="buyBtn">Buy now</button>
             </div>
             <div class="muted" style="margin-top: 10px;">Buying transfers ownership of the model NFT.</div>
           </div>
@@ -298,28 +320,28 @@ SOFTWARE.
 
           <div class="sep"></div>
 
-          <label>Inference availability</label>
+          <label for="enabledSel">Inference availability</label>
           <select id="enabledSel">
             <option value="1">Enabled</option>
             <option value="0">Disabled</option>
           </select>
 
-          <label style="margin-top: 12px;">Inference mode</label>
+          <label for="modeSel" style="margin-top: 12px;">Inference mode</label>
           <select id="modeSel">
             <option value="0">Free</option>
             <option value="1">Tips (optional)</option>
             <option value="2">Paid required</option>
           </select>
 
-          <label style="margin-top: 12px;">Inference fee (L1)</label>
+          <label for="feeSel" style="margin-top: 12px;">Inference fee (L1)</label>
           <input id="feeSel" type="number" step="0.001" value="0.001" />
           <div class="muted">UI clamps to 0.001–1 L1.</div>
 
-          <label style="margin-top: 12px;">Fee recipient</label>
+          <label for="recSel" style="margin-top: 12px;">Fee recipient</label>
           <input id="recSel" placeholder="0x… (defaults to you)" />
 
           <div class="row" style="margin-top: 14px;">
-            <button class="btn primary" id="saveSettingsBtn">Save settings</button>
+            <button type="button" class="btn primary" id="saveSettingsBtn">Save settings</button>
           </div>
 
           <div class="sep"></div>
@@ -329,10 +351,11 @@ SOFTWARE.
             This permanently burns the NFT and deletes the model metadata from the registry.
             Chunk code remains on-chain (EVM limitation), but the model is removed from the registry index.
           </p>
-          <button class="btn danger" id="burnBtn">Burn & delete model</button>
+          <button type="button" class="btn danger" id="burnBtn">Burn & delete model</button>
         </div>
       </div>
     </div>
+    </main>
 
   </div>
 

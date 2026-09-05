@@ -1,0 +1,34 @@
+{
+  "name": "gl1f-forest",
+  "version": "0.2.3",
+  "private": true,
+  "description": "Integer-quantized GBDT training, canonical serialization, and deterministic EVM inference",
+  "type": "module",
+  "scripts": {
+    "test": "python3 -m unittest -v tests.publication.test_publication",
+    "test:mint": "python3 -m unittest -v tests.publication.test_mint_validation tests.publication.test_mint_workflow",
+    "test:deployment": "python3 -m unittest -v tests.publication.test_deployment_identity",
+    "test:server": "python3 -m unittest -v tests.test_local_trainer_server",
+    "test:wheel": "python3 -m unittest -v tests.publication.test_wheel_package",
+    "test:formal": "python3 -m unittest -v tests.contracts_publication.test_formal_properties",
+    "test:archive": "python3 -m unittest -v tests.publication.test_independent_archive",
+    "test:science": "python3 tests/scientific_invariants.py --public",
+    "test:ui": "python3 tests/ui_static_check.py",
+    "test:contracts": "node tests/contracts_publication/compile_contracts.mjs",
+    "test:evm": "node tests/contracts_publication/test_evm_integration.mjs",
+    "verify": "npm run test:mint && npm run test:deployment && npm run test:server && npm run test:wheel && npm run test && npm run test:formal && npm run test:archive && npm run test:science && npm run test:ui && npm run test:contracts && npm run test:evm",
+    "benchmark": "python3 benchmarks/publication_benchmark.py --out benchmarks/results/publication_benchmark.json",
+    "benchmark:evm": "node benchmarks/evm_scaling_benchmark.mjs",
+    "witness:chain": "node benchmarks/live_chain_witness.mjs",
+    "archive:chain": "node benchmarks/archive_live_chain_state.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "ethers": "6.15.0",
+    "ganache": "7.9.2",
+    "solc": "0.8.20"
+  },
+  "license": "MIT"
+}

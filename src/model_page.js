@@ -27,7 +27,8 @@ import { setupNav } from "./ui_nav.js";
 import { setupDebugDock } from "./debug_dock.js";
 import { loadSystem, mustAddr, shortAddr, nowTs, clamp, ethToWei, weiToEth, unpackNftFeatures, sigmoid, taskLabel } from "./common.js";
 import { getReadProvider, getSignerProvider, getWalletState, connectWallet } from "./eth.js";
-import { ABI_REGISTRY, ABI_MODELNFT, ABI_RUNTIME, ABI_MARKET, ABI_STORE } from "./abis.js";
+import { ABI_REGISTRY, ABI_MODELNFT, ABI_RUNTIME, ABI_MARKET } from "./abis.js";
+import { decodeModel, loadModelBytesFromChain } from "./local_infer.js";
 
 const ethers = globalThis.ethers;
 
@@ -54,7 +55,15 @@ function packFeaturesQ(vals, scaleQ) {
   const out = new Uint8Array(vals.length * 4);
   const dv = new DataView(out.buffer);
   for (let i = 0; i < vals.length; i++) {
-    const q = Math.round(Number(vals[i]) * Number(scaleQ));
+    const value = Number(vals[i]);
+    if (!Number.isFinite(value)) {
+      throw new Error(`Feature ${i} must be a finite number`);
+    }
+    const scaled = value * Number(scaleQ);
+    if (!Number.isFinite(scaled)) {
+      throw new Error(`Feature ${i} is outside the supported numeric range`);
+    }
+    const q = Math.round(scaled);
     const cl = Math.max(-2147483648, Math.min(2147483647, q));
     dv.setInt32(i*4, cl, true);
   }
@@ -104,6 +113,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   const ownerAddrLink = document.getElementById("ownerAddrLink");
   const ownerLink = document.getElementById("ownerLink");
   const refreshBtn = document.getElementById("refreshBtn");
+  const verifyCoreBtn = document.getElementById("verifyCoreBtn");
+  const verifyCoreStatus = document.getElementById("verifyCoreStatus");
 
   const featNote = document.getElementById("featNote");
   const featList = document.getElementById("featList");
@@ -137,6 +148,102 @@ document.addEventListener("DOMContentLoaded", async () => {
   let modelTask = "regression";
   let modelLabels = null; // for binary classification: [label0, label1]
   let callMode = "view"; // view | ownerSig | none
+  let verificationCtx = null;
+
+  function setVerificationStatus(message, state = "idle") {
+    if (!verifyCoreStatus) return;
+    verifyCoreStatus.textContent = message;
+    verifyCoreStatus.dataset.state = state;
+  }
+
+  function sameAddress(left, right) {
+    return ethers.getAddress(String(left)) === ethers.getAddress(String(right));
+  }
+
+  function sameInteger(left, right) {
+    return BigInt(left) === BigInt(right);
+  }
+
+  async function verifyRegisteredCore() {
+    if (!verificationCtx) throw new Error("Model metadata is not loaded yet");
+    const { provider, registry, modelId } = verificationCtx;
+
+    const network = await provider.getNetwork();
+    if (Number(network.chainId) !== 29) {
+      throw new Error(`RPC returned chainId=${network.chainId}; expected GenesisL1 chainId=29`);
+    }
+
+    const [bytesInfo, runtimeInfo] = await Promise.all([
+      registry.getModelBytesInfo(modelId, { gasLimit: 2_000_000_000 }),
+      registry.getModelRuntime(modelId, { gasLimit: 2_000_000_000 }),
+    ]);
+
+    let lastProgress = 0;
+    const bytes = await loadModelBytesFromChain({
+      provider,
+      registry,
+      modelId,
+      log: (message) => {
+        const match = /Loaded chunk (\d+)\/(\d+)/.exec(String(message));
+        if (!match) return;
+        const current = Number(match[1]);
+        const total = Number(match[2]);
+        if (current === 1 || current === total || current - lastProgress >= 25) {
+          lastProgress = current;
+          setVerificationStatus(
+            `Reconstructing registered bytes… ${current}/${total} chunks`,
+            "pending",
+          );
+        }
+      },
+    });
+    const decoded = decodeModel(bytes);
+
+    for (let index = 0; index < 4; index++) {
+      const equal = index === 0
+        ? sameAddress(bytesInfo[index], runtimeInfo[index])
+        : sameInteger(bytesInfo[index], runtimeInfo[index]);
+      if (!equal) {
+        throw new Error(`Registry byte-manifest field ${index} disagrees with runtime metadata`);
+      }
+    }
+
+    const expectedTrees = decoded.nTrees;
+    const expectedBaseQ = decoded.version === 2 ? 0 : decoded.baseQ;
+    const headerChecks = [
+      ["nFeatures", runtimeInfo[4], decoded.nFeatures],
+      ["nTrees/treesPerOutput", runtimeInfo[5], expectedTrees],
+      ["depth", runtimeInfo[6], decoded.depth],
+      ["baseQ", runtimeInfo[7], expectedBaseQ],
+      ["scaleQ", runtimeInfo[8], decoded.scaleQ],
+      ["totalBytes", runtimeInfo[3], bytes.length],
+    ];
+    for (const [name, registered, reconstructed] of headerChecks) {
+      if (!sameInteger(registered, reconstructed)) {
+        throw new Error(
+          `${name} mismatch: registry=${registered} reconstructed=${reconstructed}`,
+        );
+      }
+    }
+    if (features.length && features.length !== decoded.nFeatures) {
+      throw new Error(
+        `NFT feature-label count ${features.length} disagrees with nFeatures=${decoded.nFeatures}`,
+      );
+    }
+    const vectorTask = modelTask === "multiclass_classification"
+      || modelTask === "multilabel_classification";
+    if ((decoded.version === 2) !== vectorTask) {
+      throw new Error(
+        `NFT task ${modelTask} disagrees with reconstructed GL1F v${decoded.version}`,
+      );
+    }
+
+    return {
+      bytes: bytes.length,
+      chunks: Number(bytesInfo[2]),
+      version: decoded.version,
+    };
+  }
 
 
   // ===== API access / subscription logic (Paid-required models) =====
@@ -614,6 +721,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     return packed;
   }
   async function loadAll() {
+    verificationCtx = null;
+    if (verifyCoreBtn) verifyCoreBtn.disabled = true;
+    setVerificationStatus(
+      "Not checked. Verification is read-only and may take several minutes for a large model.",
+      "idle",
+    );
+
     const sys = loadSystem();
     if (!sys.rpc || !sys.registry || !sys.nft || !sys.runtime) {
       log(`[${nowTs()}] [error] Missing system config (rpc/registry/nft/runtime).`);
@@ -633,6 +747,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
     const modelId = summary[1];
+    verificationCtx = { provider: rp, registry, modelId };
+    if (verifyCoreBtn) verifyCoreBtn.disabled = false;
 
     // Load the model's quantization scale (scaleQ) from the registry runtime data.
     // This keeps input packing and output decoding consistent for models trained on
@@ -1269,6 +1385,28 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   refreshBtn.addEventListener("click", loadAll);
+  verifyCoreBtn?.addEventListener("click", async () => {
+    verifyCoreBtn.disabled = true;
+    setVerificationStatus(
+      "Checking chain identity, reconstructing chunks, and reconciling metadata…",
+      "pending",
+    );
+    try {
+      const result = await verifyRegisteredCore();
+      setVerificationStatus(
+        `Verified against the current chain-29 RPC state: GL1F v${result.version}, `
+        + `${result.bytes.toLocaleString()} bytes, ${result.chunks} chunks, `
+        + "canonical metadata and modelId binding.",
+        "verified",
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setVerificationStatus(`Verification failed: ${message}`, "failed");
+      log(`[${nowTs()}] [error] model verification failed: ${message}`);
+    } finally {
+      verifyCoreBtn.disabled = false;
+    }
+  });
 
   window.addEventListener("genesis_wallet_changed", () => {
     // show tx controls when wallet connects
