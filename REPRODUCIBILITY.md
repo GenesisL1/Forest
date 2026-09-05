@@ -10,20 +10,25 @@ The verified Linux evidence profile uses:
 
 - Python 3.12.13;
 - NumPy 2.3.5;
+- setuptools 84.0.0, wheel 0.48.0, and packaging 26.3 for the offline
+  wheel-build test;
 - Node.js 24.19.0;
 - g++ 13.3.0 with C++17, `-ffp-contract=off`, and `-fno-fast-math`;
 - Solidity 0.8.20, optimizer 200, `viaIR=true`, `evmVersion=istanbul`;
 - ethers 6.15.0 and Ganache 7.9.2.
 
-Python 3.10+ and Node.js 20+ are supported for normal use. The exact evidence
-profile is pinned by `.nvmrc`, `package-lock.json`, and
-`requirements-evidence-linux-x86_64.txt`.
+Python 3.10+ and Node.js 20+ are supported for normal use. The runtime profile
+is pinned by `.nvmrc`, `package-lock.json`, and
+`requirements-evidence-linux-x86_64.txt`; the wheel-build tools are fixed in
+the install command below and in CI.
 
 ## Install
 
 ```bash
 python3 -m venv .venv
 . .venv/bin/activate
+python -m pip install --only-binary=:all: \
+  setuptools==84.0.0 wheel==0.48.0 packaging==26.3
 python -m pip install --require-hashes \
   -r requirements-evidence-linux-x86_64.txt
 npm ci
