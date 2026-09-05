@@ -1335,9 +1335,9 @@ laboratory.
 
 \subsection{Environment and artifacts}
 
-The frozen timing benchmark used Linux 6.12.13 x86-64 with glibc 2.39 on an
+The frozen timing benchmark used Linux 6.18.35 x86-64 with glibc 2.39 on an
 AMD EPYC 9V74 host with nine logical CPUs visible, Python 3.12.13, NumPy
-2.3.5\citep{harris2020numpy}, Node 24.14.0, and g++ 13.3.0. The older EVM-scaling
+2.3.5\citep{harris2020numpy}, Node 24.19.0, and g++ 13.3.0. The older EVM-scaling
 and live-chain summary observations retain their recorded Node 24.14.0 provenance.
 The canonical parity matrix and isolated-EVM integration record Node 24.19.0,
 which is the release's exact \codeword{.nvmrc} pin. The release does not relabel
@@ -1459,16 +1459,16 @@ occupy 11,064 bytes.}
 \toprule
 Engine & Regression & Binary\\
 \midrule
-Python & 0.2770 (0.0149) & 0.2812 (0.0155)\\
-C++ & 0.0336 (0.0010) & 0.0406 (0.0011)\\
-Node JS & 0.1222 (0.0060) & 0.1403 (0.0112)\\
+Python & 0.2847 (0.0183) & 0.3074 (0.0146)\\
+C++ & 0.0348 (0.0027) & 0.0421 (0.0028)\\
+Node JS & 0.1355 (0.0105) & 0.1503 (0.0082)\\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The ratios of recorded Python and C++ medians were 8.24 for regression and
-6.93 for binary classification; Python-to-Node median ratios were 2.27 and
-2.00.
+The ratios of recorded Python and C++ medians were 8.19 for regression and
+7.30 for binary classification; Python-to-Node median ratios were 2.10 and
+2.05.
 Regression cores shared SHA-256
 \hashpair{f354c657568232326d43c5a98a0b0ffa}{9392cc9bde7135b7d39c86f7f2d9f259};
 binary cores shared

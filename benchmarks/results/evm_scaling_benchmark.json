@@ -1,25 +1,25 @@
 {
   "schemaVersion": 1,
   "status": "PASS",
-  "recordedAt": "2026-07-24T21:54:19.120Z",
+  "recordedAt": "2026-09-05T21:28:04.536Z",
   "source": {
-    "revision": "ee489ab1c6a66e8e9989184b57343a7abfbe59c3",
+    "revision": "d27e1f70fa88d12b53dc8ead49cf9df6174c254d",
     "dirty": false
   },
   "environment": {
     "platform": "linux",
-    "release": "6.12.13",
+    "release": "6.18.35",
     "architecture": "x64",
     "cpu": "AMD EPYC 9V74 80-Core Processor",
     "logicalCpuCount": 9,
-    "node": "v24.14.0"
+    "node": "v24.19.0"
   },
   "compiler": {
     "version": "0.8.20+commit.a1b79de6.Emscripten.clang",
     "viaIR": true,
     "optimizerRuns": 200,
     "evmVersion": "istanbul",
-    "compileMs": 39425,
+    "compileMs": 41145,
     "runtimeBytes": {
       "ForestRuntime": 17794,
       "ModelStore": 714,
@@ -312,7 +312,7 @@
       "maxAbsoluteRelativeResidual": 0.01454958
     }
   ],
-  "totalRuntimeMs": 130457,
+  "totalRuntimeMs": 140300,
   "limitations": [
     "One host, compiler, client, hardfork, chunk geometry, and synthetic model family.",
     "eth_estimateGas observations are not mined inference receipts or live-network fees.",

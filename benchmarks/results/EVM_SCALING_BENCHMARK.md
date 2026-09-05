@@ -2,9 +2,9 @@
 
 **Status:** PASS
 
-**Recorded:** 2026-07-24T21:54:19.120Z
+**Recorded:** 2026-09-05T21:28:04.536Z
 
-**Source revision:** `ee489ab1c6a66e8e9989184b57343a7abfbe59c3`
+**Source revision:** `d27e1f70fa88d12b53dc8ead49cf9df6174c254d`
 
 **Compiler:** 0.8.20+commit.a1b79de6.Emscripten.clang; viaIR; optimizer 200; EVM target Istanbul
 
@@ -31,7 +31,7 @@ encoded model fits a transaction limit.
 - Against `primitiveReads`: gas = 42,923.392 + 1,708.277 x work; R^2 = 0.99998002; maximum absolute relative residual = 1.45%.
 
 Decision and leaf-read counts follow exactly from canonical tree geometry.
-The tree-body primitive-read count is exact for the tested scalar decoder.
+The tree-body primitive-read count is exact for the benchmarked scalar decoder.
 Fitted coefficients are empirical and can change with compiler, client,
 hardfork, chunk geometry, calldata, address warmth, and model layout.
 
