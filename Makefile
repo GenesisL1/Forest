@@ -1,6 +1,6 @@
 .PHONY: cpp test test-mint test-deployment test-server test-wheel test-formal test-archive test-science test-ui test-contracts test-evm benchmark benchmark-evm evidence-parity evidence-evm freeze-evidence pdfs verify
 
-SOURCE_DATE_EPOCH ?= 1788566400
+SOURCE_DATE_EPOCH ?= 1788652800
 TZ := UTC
 export SOURCE_DATE_EPOCH
 export FORCE_SOURCE_DATE = 1

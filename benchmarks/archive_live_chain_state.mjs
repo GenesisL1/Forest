@@ -2,7 +2,7 @@
 
 /**
  * Build a read-only, offline-replayable archive of the public GL1F deployment
- * at the publication block.
+ * at an explicitly selected block (the historical publication block by default).
  *
  * The frozen live-chain witnesses are inputs, not outputs: this collector does
  * not modify them. It obtains registry state and runtime bytecode directly by
@@ -36,11 +36,22 @@ import {
 } from "ethers";
 
 const CHAIN_ID = 29;
-const BLOCK_NUMBER = 13_342_043;
-const BLOCK_HASH = "0xffd825db1bb2534052a604db9584d361111d8bc9e19d753b0ee3861bf320d1b9";
-const ARCHIVE_ID = "gl1f-genesisl1-29-block-13342043-ffd825db-v3";
+const BLOCK_NUMBER = parsePositiveInteger(
+  process.env.GL1F_ARCHIVE_BLOCK || "13342043",
+  "GL1F_ARCHIVE_BLOCK", 1, Number.MAX_SAFE_INTEGER,
+);
+const BLOCK_HASH = process.env.GL1F_ARCHIVE_BLOCK_HASH
+  || (BLOCK_NUMBER === 13_342_043
+    ? "0xffd825db1bb2534052a604db9584d361111d8bc9e19d753b0ee3861bf320d1b9"
+    : "");
+if (!/^0x[0-9a-fA-F]{64}$/.test(BLOCK_HASH)) {
+  throw new Error("GL1F_ARCHIVE_BLOCK_HASH must explicitly pin any non-default block");
+}
+const ARCHIVE_ID = `gl1f-genesisl1-29-block-${BLOCK_NUMBER}-${BLOCK_HASH.slice(2, 10)}-v3`;
 const RPC_URL = process.env.GL1F_RPC_URL || "https://rpc.genesisl1.org";
-const DEFAULT_OUTPUT = "benchmarks/results/live_chain_archive_v3";
+const DEFAULT_OUTPUT = BLOCK_NUMBER === 13_342_043
+  ? "benchmarks/results/live_chain_archive_v3"
+  : `benchmarks/results/live_chain_archive_${BLOCK_NUMBER}`;
 const DEFAULT_WITNESS = "benchmarks/results/live_chain_witness_extended_v2.json";
 const TRANSCRIPT_FILE = "rpc/collection-transcript.ndjson.gz";
 const CHUNK_MAGIC = "0x474c3143";
@@ -107,6 +118,10 @@ const timeoutMs = parsePositiveInteger(
   "GL1F_RPC_TIMEOUT_MS",
   1_000,
   600_000,
+);
+const modelConcurrency = parsePositiveInteger(
+  process.env.GL1F_ARCHIVE_MODEL_CONCURRENCY || "1",
+  "GL1F_ARCHIVE_MODEL_CONCURRENCY", 1, 12,
 );
 
 let nextRpcId = 1;
@@ -375,6 +390,16 @@ async function rpcBatches(calls, context) {
 
 async function rpcBatchResults(calls, context) {
   return (await rpcBatches(calls, context)).map((item) => item.result);
+}
+
+async function mapLimit(items, limit, fn) {
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (next < items.length) {
+      const index = next++;
+      await fn(items[index]);
+    }
+  }));
 }
 
 async function ethCall(address, contractInterface, functionName, args, context) {
@@ -718,9 +743,9 @@ cores, exact runtime code for every pointer table and data chunk, exact runtime
 code for the five named application contracts, a complete
 \`eth_getBlockByNumber(..., true)\` result, a deterministic replay corpus, and
 a gzip-compressed raw JSON-RPC request/response-body transcript. The frozen
-extended witness supplying the recorded 108 chain outputs is embedded under
+extended witness supplying the recorded ${manifest.summary.replayVectors} chain outputs is embedded under
 \`source/\`. The collector independently recomputes every corresponding local
-output from the archived cores, reissues all 108 historical runtime calls,
+output from the archived cores, reissues all ${manifest.summary.replayVectors} block-pinned runtime calls,
 binds their exact request and result bytes to transcript entries, and requires
 both observations to agree.
 
@@ -743,11 +768,11 @@ addresses as zero-extended 32-byte words.
 
 ## Trust boundary
 
-The archive is provider-attested historical state obtained from
+The archive is provider-reported historical state obtained from
 \`${manifest.chain.rpcEndpoint}\`. The block hash is checked before and after
-collection. The provider exposes \`eth_getProof\`, so account-proof objects are
-archived for every contract/table/chunk address and their reported
-\`codeHash\` values are compared with the collected bytecode. This collector
+collection. Account-proof availability and any reported \`codeHash\` comparisons
+are recorded in \`manifest.proofEvidence\`; requested proofs may be unavailable.
+This collector
 does not implement verification of GenesisL1's returned proof encoding against
 the block state root, and no contract storage-slot proofs are requested.
 Consequently, the archive removes dependence on future archive-node
@@ -766,7 +791,9 @@ async function main() {
       "Usage: node benchmarks/archive_live_chain_state.mjs [OUTPUT_DIR] [--no-proofs]\n"
       + "\n"
       + `Default output: ${DEFAULT_OUTPUT}\n`
-      + `Pinned state: chain ${CHAIN_ID}, block ${BLOCK_NUMBER} (${BLOCK_HASH})\n`,
+      + `Pinned state: chain ${CHAIN_ID}, block ${BLOCK_NUMBER} (${BLOCK_HASH})\n`
+      + "For a new observation set GL1F_ARCHIVE_BLOCK, GL1F_ARCHIVE_BLOCK_HASH,\n"
+      + "and GL1F_ARCHIVE_WITNESS to an extended witness for that exact block.\n",
     );
     return;
   }
@@ -797,7 +824,9 @@ async function main() {
   checkedEqual(witness.chainId, CHAIN_ID, "extended witness chain ID");
   checkedEqual(witness.block.number, BLOCK_NUMBER, "extended witness block number");
   checkedHexEqual(witness.block.hash, BLOCK_HASH, "extended witness block hash");
-  checkedEqual(witness.summary.activeModels, 12, "extended witness active model count");
+  const expectedModels = parsePositiveInteger(
+    witness.summary.activeModels, "extended witness active model count", 1, 1_000_000,
+  );
   const archivedWitnessFile = "source/live_chain_witness_extended_v2.json";
   const archivedWitnessDigest = await writeArtifact(
     stagingDir,
@@ -824,7 +853,7 @@ async function main() {
 
   const contractRecords = [];
   const runtimeByAddress = new Map();
-  for (const [role, address] of Object.entries(ADDRESSES)) {
+  await Promise.all(Object.entries(ADDRESSES).map(async ([role, address]) => {
     const runtimeHex = await rpcResult(
       "eth_getCode",
       [address, blockTag],
@@ -840,7 +869,8 @@ async function main() {
       source: CONTRACT_SOURCES[role],
       runtime: { file, ...artifactDigest(runtime) },
     });
-  }
+  }));
+  contractRecords.sort((left, right) => left.role.localeCompare(right.role));
 
   const [totalMintedResult] = await ethCall(
     ADDRESSES.nft,
@@ -850,7 +880,7 @@ async function main() {
     "NFT totalMinted",
   );
   const totalMinted = asNumber(totalMintedResult, "totalMinted");
-  checkedEqual(totalMinted, 12, "pinned totalMinted");
+  checkedEqual(totalMinted, expectedModels, "pinned totalMinted");
 
   const models = [];
   const allCodeAddresses = new Set(
@@ -859,7 +889,10 @@ async function main() {
   let totalCoreBytes = 0;
   let totalChunkCount = 0;
   let totalVectorCount = 0;
-  for (let tokenId = 1; tokenId <= totalMinted; tokenId++) {
+  await mapLimit(
+    Array.from({ length: totalMinted }, (_, index) => index + 1),
+    modelConcurrency,
+    async (tokenId) => {
     const context = `token ${tokenId}`;
     const summary = await ethCall(
       ADDRESSES.registry,
@@ -1050,7 +1083,9 @@ async function main() {
       `Archived token ${tokenId}/${totalMinted}: ${core.length} bytes, `
       + `${chunks.length} chunks, ${vectors.length} replay vectors\n`,
     );
-  }
+    },
+  );
+  models.sort((left, right) => left.tokenId - right.tokenId);
 
   let proofAvailability = {
     requested: proofMode,
@@ -1222,6 +1257,7 @@ async function main() {
       rpcBatchSize: batchSize,
       rpcRetries: retryCount,
       rpcTimeoutMs: timeoutMs,
+      modelConcurrency,
     },
     chain: {
       name: "GenesisL1",
@@ -1236,8 +1272,8 @@ async function main() {
       rpcEndpoint: RPC_URL,
       blockHashCheckedBeforeAndAfterCollection: true,
       trustModel:
-        "provider-attested archive; exact bytes and provider proofs retained, "
-        + "but returned proof paths and consensus headers are not independently verified",
+        "provider-reported archive; exact bytes retained, but any returned "
+        + "proof paths and consensus headers are not independently verified",
     },
     readOnlyRpc: {
       methodsUsed: Object.keys(methodCounts).sort(),
@@ -1265,7 +1301,7 @@ async function main() {
       role:
         "source of the deterministic vector corpus and a prior historical-chain "
         + "observation; the source is embedded, every local expected output is "
-        + "recomputed, and all 108 chain calls are reissued into this archive's transcript",
+        + `recomputed, and all ${totalVectorCount} chain calls are reissued into this archive's transcript`,
     },
     contracts: contractRecords,
     registrySnapshot: {
@@ -1318,9 +1354,9 @@ async function main() {
       + "chunk payloads, require totalBytes, then compare core and Keccak-256.",
     limitations: [
       "The historical state and block JSON are responses from the named RPC provider.",
-      "Account proofs are retained when eth_getProof is available, but this collector does not verify the provider-specific proof encoding or consensus header chain.",
+      "Account proofs are retained only when requested and supported by the provider; this collector does not verify the provider-specific proof encoding or consensus header chain.",
       "No contract storage-slot proof is requested; registry values are archived as raw historical eth_call responses in the transcript.",
-      "The embedded witness's earlier run did not retain raw response bodies; this archive therefore reissues all 108 historical runtime calls and retains their exact request/response bodies.",
+      `The embedded witness's earlier run did not retain raw response bodies; this archive therefore reissues all ${totalVectorCount} block-pinned runtime calls and retains their exact request/response bodies.`,
       "The replay corpus establishes exact agreement only for the archived inputs, not predictive validity.",
     ],
     models,

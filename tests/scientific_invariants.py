@@ -11,7 +11,7 @@ import re
 
 
 ROOT = Path(__file__).resolve().parents[1]
-TITLE = "Artifact-to-Execution Assurance for Canonical Integer GBDTs on the EVM"
+TITLE = "GL1F: Reproducible Integer Tree-Ensemble Inference on the EVM"
 
 
 class InvariantFailure(RuntimeError):
@@ -109,6 +109,53 @@ def check_evm_scaling() -> None:
     require(len(record.get("profiles", [])) == 6, "EVM profile count drift")
 
 
+
+def check_storage_comparison() -> None:
+    record = json.loads((ROOT / "benchmarks/results/storage_comparison.json").read_text())
+    require(record.get("status") == "PASS", "storage comparison status")
+    sources = record.get("source", {}).get("sha256", {})
+    require_source_digests({"sourceDigests": sources}, "storage comparison")
+    require(record.get("threeWayComparisons") == 72, "storage comparison count")
+    require(record.get("referenceEvmComparisons") == 144, "storage reference count")
+    require(record.get("mismatches") == 0, "storage mismatch count")
+    profiles = record.get("profiles", [])
+    require(len(profiles) == 6, "storage shape count")
+    for profile in profiles:
+        observations = profile.get("observations", [])
+        require(len(observations) == 12, "storage vector count")
+        for item in observations:
+            require(
+                item["referenceOutputQ"] == item["codeOutputQ"] == item["storageOutputQ"],
+                "storage recorded output disagreement",
+            )
+        for backend in ("code", "storage"):
+            values = [int(item[backend + "EstimatedGas"]) for item in observations]
+            stats = profile["inferenceEstimates"][backend]
+            require(abs(sum(values) / len(values) - stats["mean"]) < 1e-7,
+                    "storage gas mean disagrees with raw observations")
+        gas = profile["perModelGas"]
+        writes = sum(map(int, gas["codeChunkWriteReceipts"])) + int(gas["codeTableWriteReceipt"])
+        require(writes == int(gas["codeMaterialization"]), "storage publication receipt sum")
+
+
+
+def check_deployment_archive() -> None:
+    record = json.loads((ROOT / "benchmarks/results/live_chain_replay_13602838.json").read_text())
+    require(record.get("schema") == "gl1f-live-chain-replay-result/v1", "archive schema")
+    chain = record["chain"]
+    require(chain["chainId"] == 29 and chain["blockNumber"] == 13602838, "archive chain pin")
+    require(chain["blockHash"] == "0xfd3da1020c37ee3c1fe7cd0a6060dbc5ec3ec5fb90c0b812256dc33e467dace3", "archive block hash")
+    archive = ROOT / "benchmarks/results/live_chain_archive_13602838.tar.gz"
+    require(archive.stat().st_size == record["archive"]["bytes"], "archive size")
+    require(sha256(archive) == record["archive"]["sha256"], "archive digest")
+    verification = record["independentVerification"]
+    require(verification["status"] == "verified", "archive replay status")
+    require(verification["modelsChecked"] == 12, "archive model count")
+    require(verification["vectorsChecked"] == 108, "archive vector count")
+    require(verification["coreBytesChecked"] == 31185324, "archive core bytes")
+    require(record["summary"]["dataChunks"] == 1306, "archive chunk count")
+
+
 def check_evm_integration() -> None:
     record = json.loads(
         (ROOT / "benchmarks/results/evm_integration.json").read_text(encoding="utf-8")
@@ -159,6 +206,8 @@ def main() -> int:
         check_paper_surfaces()
         check_historical_summary()
         check_evm_scaling()
+        check_storage_comparison()
+        check_deployment_archive()
         check_evm_integration()
         check_parity()
     except (InvariantFailure, OSError, ValueError, TypeError, json.JSONDecodeError) as error:
@@ -167,7 +216,7 @@ def main() -> int:
     print(
         "SCIENTIFIC INVARIANTS: PASS "
         "(paper/formal notation; checked-in parity and local-EVM records; "
-        "historical provider-summary consistency)"
+        "storage comparison; pinned archive digest; historical summary consistency)"
     )
     return 0
 

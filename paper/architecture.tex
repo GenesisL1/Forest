@@ -1,89 +1,25 @@
-\begin{figure}[t]
+\begin{figure}[htbp]
 \centering
-\resizebox{\linewidth}{!}{%
 \begin{tikzpicture}[
   font=\small,
-  node distance=8mm and 8mm,
-  box/.style={
-    draw=GLBlue!75!black,
-    rounded corners=2pt,
-    line width=0.7pt,
-    fill=GLBlue!5,
-    align=center,
-    minimum height=10mm,
-    text width=27mm
-  },
-  live/.style={
-    box,
-    draw=GLGreen!75!black,
-    fill=GLGreen!6
-  },
-  verify/.style={
-    box,
-    draw=GLGold!80!black,
-    fill=GLGold!8
-  },
-  flow/.style={-{Latex[length=2.4mm]}, line width=0.7pt, draw=GLInk!75},
-  check/.style={-{Latex[length=2.4mm]}, line width=0.7pt, dashed, draw=GLGold!80!black}
+  box/.style={draw=black!65,align=center,text width=43mm,minimum height=13mm,inner sep=3mm},
+  flow/.style={-{Latex[length=2mm]},thick},
+  check/.style={-{Latex[length=2mm]},dashed,thick}
 ]
-
-\node[box] (browser) {Browser trainer\\and studio};
-\node[box, below=of browser] (python) {Python CLI\\trainer};
-\node[box, below=of python] (cpp) {C++17 CLI\\trainer};
-
-\node[box, right=14mm of python, text width=31mm] (core) {Canonical GL1F core\\\texttt{GL1F} header +\\fixed-depth trees};
-\node[verify, above=of core, text width=31mm] (oracle) {Strict independent parser\\hash and conformance report};
-\node[verify, below=of core, text width=31mm] (local) {Local integer evaluator\\scalar or vector output};
-
-\node[live, right=14mm of core] (chunks) {Immutable code-as-data\\\texttt{GL1C} chunks};
-\node[live, above=of chunks] (table) {Ordered pointer table\\\texttt{GL1C} + addresses};
-\node[live, below=of chunks] (registry) {Registry + Model NFT\\mutable service metadata};
-
-\node[live, right=14mm of chunks, text width=29mm] (runtime) {ForestRuntime\\direct EVM integer\\inference};
-\node[verify, above=of runtime, text width=29mm] (witness) {Pinned-state witness\\reconstruct, hash,\\compare outputs};
-\node[box, below=of runtime, text width=29mm] (dapp) {Browser dApp or\\contract caller};
-
-\draw[flow] (browser) -- (core);
-\draw[flow] (python) -- (core);
-\draw[flow] (cpp) -- (core);
-\draw[flow] (core) -- (chunks);
-\draw[flow] (chunks) -- (table);
-\draw[flow] (table) -- (registry);
-\draw[flow] (registry) -- (runtime);
-\draw[flow] (chunks) -- (runtime);
-\draw[flow] (dapp) -- (runtime);
-
-\draw[check] (oracle) -- (core);
-\draw[check] (core) -- (local);
-\draw[check] (witness) -- (table);
-\draw[check] (witness) -- (chunks);
-\draw[check] (witness) -- (runtime);
-\path (oracle.north) ++(0,7mm) coordinate (verifytop);
-\draw[check] (local.west) -- ++(-6mm,0) |- (verifytop) -| (witness.north);
-
-\node[
-  draw=GLInk!35,
-  rounded corners=2pt,
-  fill=white,
-  align=left,
-  font=\footnotesize,
-  below=13mm of registry,
-  text width=91mm
-] (boundary) {
-\textbf{Assurance boundary.}
-Green boxes are components observed at the pinned GenesisL1 deployment.
-Gold boxes provide separate checking paths. Registry existence alone does not
-authenticate a model: the witness must establish exact reconstruction,
-canonical decoding, registry/header agreement, and
-$\operatorname{keccak256}(\mathrm{core})=\mathrm{modelId}$.
-};
-
+\node[box] (core) {Canonical core $B$\\scalar or vector ensemble};
+\node[box,right=15mm of core] (store) {Code chunks and address table\\at state $\sigma$};
+\node[box,below=15mm of core] (local) {Strict reconstruction\\and local evaluation};
+\node[box,below=15mm of store] (evm) {Registry $r$ and\\EVM evaluation};
+\draw[flow] (core) -- (store);
+\draw[flow] (core) -- (local);
+\draw[flow] (store) -- (evm);
+\draw[check] (store.south west) -- (local.north east);
+\draw[check] (local) -- node[above,font=\footnotesize] {same $q$} node[below,font=\footnotesize] {compare} (evm);
 \end{tikzpicture}
-}
-\caption{GL1F publication and inference path. Solid arrows show production
-data flow; dashed arrows show separate verification paths. Model bytes are
-intentionally public. Registry, NFT, pricing, and marketplace state are
-services around the model and do not alter its mathematical inference
-semantics.}
+\caption{Publication and verification paths. Solid arrows indicate artifact or
+execution flow; dashed arrows indicate reconstruction and comparison.
+Verification checks canonical bytes, ordered storage, registry agreement,
+and content binding before comparing the integer outputs for the same packed
+input $q$.}
 \label{fig:architecture}
 \end{figure}

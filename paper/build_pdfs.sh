@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-export SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-1788566400}"
+export SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-1788652800}"
 export FORCE_SOURCE_DATE=1
 
 repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

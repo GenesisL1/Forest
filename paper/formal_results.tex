@@ -583,24 +583,20 @@ produce an on-chain event, or support service-level economics.  It is not
 model encryption, copy protection, or exclusive inference.
 \end{remark}
 
-\subsection{Proof obligations for a publication-grade deployment}
+\subsection{Verification requirements}
 
-The strongest reproducibility record should contain:
-\begin{enumerate}
-  \item the exact core bytes and both SHA-256 and Keccak-256 digests;
-  \item all chunk addresses, runtime code hashes, ordered table address,
-        $c,N,$ and $\ell$;
-  \item a strict parser report covering magic, version, reserved fields,
-        dimensions, exact length, and every feature index;
-  \item the nine named registry/core/storage relations above, plus any
-        separately claimed NFT feature metadata;
-  \item packed feature vectors and integer outputs for conformance cases;
-  \item source revision, compiler version and binary digest, optimizer
-        settings, IR setting, EVM target, creation bytecode, and deployed
-        bytecode hash; and
-  \item a parity matrix that distinguishes byte-identical training evidence
-        from the inference theorem proved above.
-\end{enumerate}
+Applying the equivalence theorem to a concrete deployment requires an exact
+core and storage reconstruction, canonical parser validation, agreement of
+all nine registry/core/storage relations, and identical packed inputs.
+A separately claimed content identifier requires recomputing the core's
+Keccak-256 digest. Core bytes, chunk code, ordered addresses, registry
+responses, packed vectors, and expected integer outputs allow these
+conditions to be checked independently from a retained observation.
 
-These obligations make the claim falsifiable: an independent party can either
-reproduce every integer output or identify the first violated premise.
+Source revision and compiler settings identify the build used in local
+tests. Creation and deployed bytecode, together with their hashes, are
+needed to examine any stronger source-to-deployment claim. Byte-identical
+training results remain empirical evidence separate from the inference
+theorem. These distinctions allow a failed reproduction to be assigned to a
+specific representation, state, input, arithmetic, or implementation
+premise.

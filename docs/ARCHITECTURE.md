@@ -117,15 +117,16 @@ and hash and independently replay public bytes and inputs.
 | C++ | `cpp/train_gl1f_cpp.cpp` | Native training and packaging |
 | Contracts | `contracts/*.sol` | Storage, registry, NFT, runtime, marketplace |
 | Reproducer | `benchmarks/live_chain_witness.mjs` | Pinned-chain reconstruction and output comparison |
-| Optional archive collector | `benchmarks/archive_live_chain_state.mjs` | Create a local archive of provider-returned pinned code and calls; no such archive is checked in |
+| Optional archive collector | `benchmarks/archive_live_chain_state.mjs` | Archive provider-returned pinned code and calls; the September 6 archive is included |
 | Offline-verifier tooling | `benchmarks/independent_archive_verify.py` | Parse, reconstruct, hash, locally evaluate, and compare a supplied archive |
 
 ## Evidence boundary
 
 The repository tests establish behavior only for their stated profiles and
-fixtures. The recorded provider-attested summary reports reconstruction,
-commitment, manifest, and execution agreement for the 12 active records at
-block 13,342,043. Its raw provider responses and reconstructed deployed bytes
-are not checked in. Neither evidence class establishes predictive accuracy,
+fixtures. The replayable archive at block 13,602,838 retains the raw responses and
+reconstructed bytes for all 12 active records and 108 exact input/output
+comparisons. The older July observation at block 13,342,043 remains a
+summary without its underlying raw responses. See `REPRODUCIBILITY.md` for
+offline verification of the new archive. Neither evidence class establishes predictive accuracy,
 data provenance, fairness, causal validity, safety, or future registry
 integrity.

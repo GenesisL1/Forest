@@ -69,6 +69,7 @@ write to, or alter GenesisL1.
 | `benchmarks/results/parity_matrix.json` | 25 distinct JavaScript/Python/C++ training profiles, five auxiliary controls, and one standalone IEEE-754 operation-order witness; status `PASS` |
 | `benchmarks/results/evm_integration.json` | Local deployment, chunk reconstruction, content-hash checks, scalar/vector/class inference, 18 view comparisons, two isolated transactions, and zero mismatches |
 | `benchmarks/results/evm_scaling_benchmark.json` | Six scalar shapes and 72 reference/runtime comparisons with zero mismatches |
+| `benchmarks/results/storage_comparison.json` | Six identical scalar cores in code-as-data and packed Solidity storage; 72 three-way output comparisons, raw gas observations and source digests |
 | `benchmarks/results/publication_benchmark.json` | Thirty measured runs per engine and workload, including environment and model digests |
 | `deployments/genesisl1.json` | Chain ID, pinned block, and deployed contract addresses used by the paper |
 
@@ -101,6 +102,18 @@ Regenerate the isolated-EVM scaling study:
 npm run benchmark:evm
 ```
 
+Reproduce the controlled storage comparison:
+
+```bash
+node benchmarks/storage_comparison.mjs
+```
+
+This local experiment stores identical canonical bytes through the production
+code-as-data backend and a packed Solidity-storage comparator. It records
+per-model write receipts separately from common registry and shared deployment
+costs, and measures view-gas estimates on the same inputs. The comparator is
+benchmark code, not a production replacement contract.
+
 Model digests and integer comparison results are conformance checks. Wall
 times and gas estimates depend on the host, compiler, EVM implementation, and
 execution path and are not portable performance guarantees.
@@ -114,10 +127,50 @@ make pdfs
 ```
 
 The outputs are `GL1F.pdf` and `paper/GL1F_Formal_Supplement.pdf`.
+The main manuscript uses the Ledger author template with publication-status
+metadata omitted; both documents remain unreviewed author materials.
 
-## Pinned-chain observation
+## Replayable pinned-chain observation
 
-The paper reports a provider-attested observation at GenesisL1 block
+The main article uses a fresh observation at GenesisL1 block **13,602,838**,
+with timestamp **2026-09-06 17:20:41 UTC** and hash
+`0xfd3da1020c37ee3c1fe7cd0a6060dbc5ec3ec5fb90c0b812256dc33e467dace3`.
+The compressed archive is
+[`benchmarks/results/live_chain_archive_13602838.tar.gz`](benchmarks/results/live_chain_archive_13602838.tar.gz).
+Its [result record](benchmarks/results/live_chain_replay_13602838.json)
+contains the archive checksum and independent verification counts.
+
+The archive contains the 12 model cores, exact storage runtimes and tables,
+five deployed contract runtimes, pinned block records, raw RPC transcript,
+108 packed conformance vectors and outputs, collector source, and file digests.
+It preserves 31,185,324 model bytes reconstructed from 1,306 chunks. The raw
+transcript records the provider's responses; it does not authenticate chain
+consensus or verify account-proof paths.
+
+Reproduce the checks offline with the Python standard library:
+
+```bash
+mkdir -p tmp/chain-replay
+tar -xzf benchmarks/results/live_chain_archive_13602838.tar.gz \
+  -C tmp/chain-replay
+python3 benchmarks/independent_archive_verify.py \
+  --manifest tmp/chain-replay/live_chain_archive_13602838/manifest.json
+```
+
+The expected result is `verified`: 12 models, 31,185,324 core bytes, and 108
+vectors. This checks raw-observation consistency, file digests, strict parsing,
+reconstruction, content commitments, registry relations, and integer outputs.
+It requires no RPC endpoint and submits no transactions.
+
+A new collection requires a fresh extended witness for the same explicitly
+selected block. The collector accepts `GL1F_ARCHIVE_BLOCK`,
+`GL1F_ARCHIVE_BLOCK_HASH`, and `GL1F_ARCHIVE_WITNESS`; run
+`node benchmarks/archive_live_chain_state.mjs --help` for collection options.
+An unavailable historical state is an error, never a fallback to latest state.
+
+## Historical summary
+
+Earlier factual summaries report a provider-attested observation at GenesisL1 block
 13,342,043. The method is implemented by
 `benchmarks/live_chain_witness.mjs`; the factual summaries are stored in
 `benchmarks/results/LIVE_CHAIN_WITNESS.md` and

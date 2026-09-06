@@ -1,0 +1,95 @@
+{
+  "schema": "gl1f-live-chain-replay-result/v1",
+  "chain": {
+    "name": "GenesisL1",
+    "chainId": 29,
+    "blockNumber": 13602838,
+    "blockTag": "0xcf9016",
+    "blockHash": "0xfd3da1020c37ee3c1fe7cd0a6060dbc5ec3ec5fb90c0b812256dc33e467dace3",
+    "blockTimestamp": 1788715241,
+    "blockStateRoot": "0x7db2ecd73c80227dd606cdcbabe826034f78ecf828dcb0077c94d791aedb92cd",
+    "fullTransactionsRequested": true,
+    "rpcEndpoint": "https://rpc.genesisl1.org",
+    "blockHashCheckedBeforeAndAfterCollection": true,
+    "trustModel": "provider-reported archive; exact bytes retained, but any returned proof paths and consensus headers are not independently verified"
+  },
+  "archive": {
+    "file": "live_chain_archive_13602838.tar.gz",
+    "bytes": 21972369,
+    "sha256": "8eb74d8569011dbfc4d0dd9d594553de667618c85cdf3c1387b050acd2b2f0bd",
+    "manifestFile": "live_chain_archive_13602838/manifest.json",
+    "manifestSha256": "20085445c32649c60fcbb6a9ff52c71d379345612816b389162c4e949fb2e216"
+  },
+  "collectedAt": "2026-09-06T17:46:12.142Z",
+  "summary": {
+    "activeModels": 12,
+    "reconstructedCoreBytes": 31185324,
+    "pointerTables": 12,
+    "dataChunks": 1306,
+    "uniqueCodeAddresses": 1323,
+    "contentCommitmentsMatched": 12,
+    "registryHeaderRelationsMatched": 12,
+    "replayVectors": 108,
+    "historicalRuntimeCallsReissued": 108,
+    "locallyRecomputedVectorOutputsMatched": 108,
+    "archivedChainOutputsExactlyMatched": 108,
+    "archivedChainOutputsMatchingEmbeddedWitness": 108
+  },
+  "contracts": [
+    {
+      "role": "marketplace",
+      "address": "0xA9bfa0a719b7F73cE85CA1E7f23af626D383fB46",
+      "runtimeBytes": 3828,
+      "runtimeKeccak256": "0x2bbd1b7ee9e460c4614c84d119d93f9c81b9559c501deb27dd9f1c1e04765c0e"
+    },
+    {
+      "role": "nft",
+      "address": "0x44Dc1c54B8D579B42d78cC21cf8260DC0A3279fA",
+      "runtimeBytes": 5968,
+      "runtimeKeccak256": "0x6ca65889cb653363fd22f8e7b480493cc8c19f16e2b624f8aff11aed294743d3"
+    },
+    {
+      "role": "registry",
+      "address": "0x33c9844F77a07e36B98f0FFf8201B8A8b02c2a69",
+      "runtimeBytes": 12725,
+      "runtimeKeccak256": "0x159a4f55c4d64e8f1daaa47429073e28131e6df25256f5e1409ed2ca6559c24a"
+    },
+    {
+      "role": "runtime",
+      "address": "0xD2fD0cf461a6cb56Fc08d9aEc120833D8E79044E",
+      "runtimeBytes": 17794,
+      "runtimeKeccak256": "0xeacdd3d0f7034aa2e7c37402eba6e9841b811a6da5fd2ab15a32465fbb04fa59"
+    },
+    {
+      "role": "store",
+      "address": "0x9CdbC23392648Bd27B4A5eD09c0fEa9452454B54",
+      "runtimeBytes": 714,
+      "runtimeKeccak256": "0xe8bbff9c37c91122602802c7a3fdd5355ffc051acdb05188cfbd547106d235a5"
+    }
+  ],
+  "independentVerification": {
+    "archiveId": "gl1f-genesisl1-29-block-13602838-fd3da102-v3",
+    "coreBytesChecked": 31185324,
+    "filesChecked": 34,
+    "modelsChecked": 12,
+    "status": "verified",
+    "vectorsChecked": 108
+  },
+  "verifier": "benchmarks/independent_archive_verify.py",
+  "proofEvidence": {
+    "requested": false,
+    "available": false,
+    "collection": "not requested",
+    "accountProofs": 0,
+    "storageProofsRequested": 0,
+    "codeHashesMatched": 0,
+    "file": null
+  },
+  "limitations": [
+    "The historical state and block JSON are responses from the named RPC provider.",
+    "Account proofs are retained only when requested and supported by the provider; this collector does not verify the provider-specific proof encoding or consensus header chain.",
+    "No contract storage-slot proof is requested; registry values are archived as raw historical eth_call responses in the transcript.",
+    "The embedded witness's earlier run did not retain raw response bodies; this archive therefore reissues all 108 block-pinned runtime calls and retains their exact request/response bodies.",
+    "The replay corpus establishes exact agreement only for the archived inputs, not predictive validity."
+  ]
+}

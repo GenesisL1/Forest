@@ -1,0 +1,1185 @@
+{
+  "schemaVersion": 1,
+  "status": "PASS",
+  "recordedAt": "2026-09-06T17:28:48.925Z",
+  "source": {
+    "revision": "2019d5fe3065168c805e435d67408e146822f544",
+    "dirty": true,
+    "sha256": {
+      "benchmarks/storage_comparison.mjs": "7d71b3ed7d0e7fe25d03c1e4acdb7f0ad24451aba8ad34002b8bc0bc57773e74",
+      "benchmarks/contracts/PackedStorageBaseline.sol": "fe18b82f2b8fe511b41d3264be34446b6a5911aad0d2022601ea3c196b5f1f22",
+      "tests/contracts_publication/test_evm_integration.mjs": "62bbe8702aedc8e02d62390c0a809fbbbc13ee85f370788dace2365f5d5d8c05",
+      "contracts/ForestRuntime.sol": "72bfe83900ad7d74023a40945ec7bfe7ab123dbe274583acccd539886978a222",
+      "contracts/ModelStore.sol": "0172f17dc9c3d549867f5fe02ff0e43ad09da37f5144120863c6e1ab9e003d61",
+      "contracts/ModelRegistry.sol": "bc1b5e02e28a98af780efc0f8331816e4acc995f0b0c209b1eebb90d35be0812",
+      "contracts/ModelNFT.sol": "b190e8a4f363bc3050ab9d3d35f41c43b63bccef9670e6c51415713b7cbf9ff3",
+      "contracts/SimpleOwnable.sol": "03a4ea9b113a9d14ca8e4380ce017f0cc20c9b7b8962861fbbc7301355f83394",
+      "package-lock.json": "499eea40ccb1e607875aee52e9c9f95fa65c5011eedd4a3796c23f1e9939eb38",
+      ".nvmrc": "7e8a2fa94951112b894a3dbe3d05efef5e9263741fa49125f0a70f40fedab4cc"
+    }
+  },
+  "environment": {
+    "node": "v24.19.0",
+    "platform": "linux",
+    "architecture": "x64",
+    "cpu": "AMD EPYC 9V74 80-Core Processor"
+  },
+  "compiler": {
+    "version": "0.8.20+commit.a1b79de6.Emscripten.clang",
+    "viaIR": true,
+    "optimizerRuns": 200,
+    "evmVersion": "istanbul",
+    "runtimeBytes": {
+      "ForestRuntime": 17794,
+      "ModelStore": 714,
+      "ModelRegistry": 12725,
+      "ModelNFT": 5968,
+      "PackedStorageBaseline": 3057
+    }
+  },
+  "chain": {
+    "engine": "ganache 7.9.2",
+    "chainId": 1337,
+    "hardfork": "shanghai",
+    "blockGasLimit": 30000000
+  },
+  "design": {
+    "chunkSize": 20000,
+    "vectorSeed": 20260724,
+    "vectorsPerProfile": 12,
+    "featureCount": 2,
+    "scaleQ": 1000,
+    "baseQ": 137,
+    "baseline": "Exact canonical core bytes in a Solidity mapping(bytes32 => bytes); packed word SLOAD decoder.",
+    "sharedMetadata": "Both paths query the same registered model twice, matching the production scalar entry point.",
+    "gasScope": "Materialization uses mined local transaction receipts. Inference uses independent eth_estimateGas requests; access warmth resets for each request.",
+    "storageAccounting": "Code includes all chunk magic and the pointer table. Storage includes one length slot and ceil(coreBytes/32) data slots. Both exclude common registry metadata, shared executable code, account and trie overhead."
+  },
+  "sharedDeploymentGas": {
+    "ModelStore": "207748",
+    "ModelRegistry": "3050107",
+    "ModelNFT": "1404331",
+    "RegistryNFTLink": "47810",
+    "ForestRuntime": "3897154",
+    "PackedStorageBaseline": "715115"
+  },
+  "profiles": [
+    {
+      "trees": 20,
+      "depth": 3,
+      "modelId": "0x1832015fcb1647d9382dcd7256fe1574eef39047b7e9bde6b5b970267774e066",
+      "coreBytes": 1784,
+      "coreSha256": "fe4de82c1aa52e82ac806e257a824d7ac944692be7a9c831ac668ff63d864bcc",
+      "chunks": 1,
+      "materializedData": {
+        "codeBytesIncludingMagicAndPointerTable": 1824,
+        "solidityStorageSlots": 57,
+        "solidityStorageBytes": 1824
+      },
+      "perModelGas": {
+        "codeChunkWriteReceipts": [
+          "436897"
+        ],
+        "codeTableWriteReceipt": "63383",
+        "codeMaterialization": "500280",
+        "storageMaterialization": "1309958",
+        "commonRegistryRegistration": "737749",
+        "storageToCodeMaterializationRatio": 2.618449668185816
+      },
+      "inferenceEstimates": {
+        "code": {
+          "min": 286211,
+          "max": 286280,
+          "mean": 286246.9166666667,
+          "median": 286242.5
+        },
+        "storage": {
+          "min": 267067,
+          "max": 267136,
+          "mean": 267102.9166666667,
+          "median": 267098.5
+        },
+        "storageToCodeMeanRatio": 0.9331206769912805
+      },
+      "observations": [
+        {
+          "featuresQ": [
+            -2652,
+            -1521
+          ],
+          "packedFeatures": "0xa4f5ffff0ffaffff",
+          "referenceOutputQ": "-12759",
+          "codeOutputQ": "-12759",
+          "storageOutputQ": "-12759",
+          "codeEstimatedGas": "286280",
+          "storageEstimatedGas": "267136"
+        },
+        {
+          "featuresQ": [
+            -1548,
+            904
+          ],
+          "packedFeatures": "0xf4f9ffff88030000",
+          "referenceOutputQ": "-11426",
+          "codeOutputQ": "-11426",
+          "storageOutputQ": "-11426",
+          "codeEstimatedGas": "286238",
+          "storageEstimatedGas": "267094"
+        },
+        {
+          "featuresQ": [
+            -1705,
+            1096
+          ],
+          "packedFeatures": "0x57f9ffff48040000",
+          "referenceOutputQ": "-11488",
+          "codeOutputQ": "-11488",
+          "storageOutputQ": "-11488",
+          "codeEstimatedGas": "286239",
+          "storageEstimatedGas": "267095"
+        },
+        {
+          "featuresQ": [
+            -1395,
+            -2162
+          ],
+          "packedFeatures": "0x8dfaffff8ef7ffff",
+          "referenceOutputQ": "-12170",
+          "codeOutputQ": "-12170",
+          "storageOutputQ": "-12170",
+          "codeEstimatedGas": "286273",
+          "storageEstimatedGas": "267129"
+        },
+        {
+          "featuresQ": [
+            2103,
+            -2722
+          ],
+          "packedFeatures": "0x370800005ef5ffff",
+          "referenceOutputQ": "-12790",
+          "codeOutputQ": "-12790",
+          "storageOutputQ": "-12790",
+          "codeEstimatedGas": "286254",
+          "storageEstimatedGas": "267110"
+        },
+        {
+          "featuresQ": [
+            -1077,
+            -2103
+          ],
+          "packedFeatures": "0xcbfbffffc9f7ffff",
+          "referenceOutputQ": "-12015",
+          "codeOutputQ": "-12015",
+          "storageOutputQ": "-12015",
+          "codeEstimatedGas": "286270",
+          "storageEstimatedGas": "267126"
+        },
+        {
+          "featuresQ": [
+            2839,
+            2399
+          ],
+          "packedFeatures": "0x170b00005f090000",
+          "referenceOutputQ": "-11333",
+          "codeOutputQ": "-11333",
+          "storageOutputQ": "-11333",
+          "codeEstimatedGas": "286211",
+          "storageEstimatedGas": "267067"
+        },
+        {
+          "featuresQ": [
+            696,
+            -1274
+          ],
+          "packedFeatures": "0xb802000006fbffff",
+          "referenceOutputQ": "-11364",
+          "codeOutputQ": "-11364",
+          "storageOutputQ": "-11364",
+          "codeEstimatedGas": "286236",
+          "storageEstimatedGas": "267092"
+        },
+        {
+          "featuresQ": [
+            1395,
+            -1217
+          ],
+          "packedFeatures": "0x730500003ffbffff",
+          "referenceOutputQ": "-11333",
+          "codeOutputQ": "-11333",
+          "storageOutputQ": "-11333",
+          "codeEstimatedGas": "286235",
+          "storageEstimatedGas": "267091"
+        },
+        {
+          "featuresQ": [
+            989,
+            -2055
+          ],
+          "packedFeatures": "0xdd030000f9f7ffff",
+          "referenceOutputQ": "-11984",
+          "codeOutputQ": "-11984",
+          "storageOutputQ": "-11984",
+          "codeEstimatedGas": "286246",
+          "storageEstimatedGas": "267102"
+        },
+        {
+          "featuresQ": [
+            2454,
+            -63
+          ],
+          "packedFeatures": "0x96090000c1ffffff",
+          "referenceOutputQ": "-11333",
+          "codeOutputQ": "-11333",
+          "storageOutputQ": "-11333",
+          "codeEstimatedGas": "286235",
+          "storageEstimatedGas": "267091"
+        },
+        {
+          "featuresQ": [
+            1591,
+            -2073
+          ],
+          "packedFeatures": "0x37060000e7f7ffff",
+          "referenceOutputQ": "-12015",
+          "codeOutputQ": "-12015",
+          "storageOutputQ": "-12015",
+          "codeEstimatedGas": "286246",
+          "storageEstimatedGas": "267102"
+        }
+      ]
+    },
+    {
+      "trees": 50,
+      "depth": 3,
+      "modelId": "0x62daf4bbf8c3ff6e099f9e2b8caef6e60b7ed59013198d1d2532512894f38735",
+      "coreBytes": 4424,
+      "coreSha256": "98dd7be8dd35ccee5966074f980e94131f00bb1167df551a17c1119bee51b21c",
+      "chunks": 1,
+      "materializedData": {
+        "codeBytesIncludingMagicAndPointerTable": 4464,
+        "solidityStorageSlots": 140,
+        "solidityStorageBytes": 4480
+      },
+      "perModelGas": {
+        "codeChunkWriteReceipts": [
+          "998781"
+        ],
+        "codeTableWriteReceipt": "63383",
+        "codeMaterialization": "1062164",
+        "storageMaterialization": "3183812",
+        "commonRegistryRegistration": "689249",
+        "storageToCodeMaterializationRatio": 2.9974768491494723
+      },
+      "inferenceEstimates": {
+        "code": {
+          "min": 644382,
+          "max": 644535,
+          "mean": 644454.1666666666,
+          "median": 644443
+        },
+        "storage": {
+          "min": 597145,
+          "max": 599174,
+          "mean": 597689.1666666666,
+          "median": 597218
+        },
+        "storageToCodeMeanRatio": 0.9274347154245518
+      },
+      "observations": [
+        {
+          "featuresQ": [
+            -2652,
+            -1521
+          ],
+          "packedFeatures": "0xa4f5ffff0ffaffff",
+          "referenceOutputQ": "-23166",
+          "codeOutputQ": "-23166",
+          "storageOutputQ": "-23166",
+          "codeEstimatedGas": "644535",
+          "storageEstimatedGas": "597270"
+        },
+        {
+          "featuresQ": [
+            -1548,
+            904
+          ],
+          "packedFeatures": "0xf4f9ffff88030000",
+          "referenceOutputQ": "-17896",
+          "codeOutputQ": "-17896",
+          "storageOutputQ": "-17896",
+          "codeEstimatedGas": "644436",
+          "storageEstimatedGas": "599171"
+        },
+        {
+          "featuresQ": [
+            -1705,
+            1096
+          ],
+          "packedFeatures": "0x57f9ffff48040000",
+          "referenceOutputQ": "-18175",
+          "codeOutputQ": "-18175",
+          "storageOutputQ": "-18175",
+          "codeEstimatedGas": "644439",
+          "storageEstimatedGas": "599174"
+        },
+        {
+          "featuresQ": [
+            -1395,
+            -2162
+          ],
+          "packedFeatures": "0x8dfaffff8ef7ffff",
+          "referenceOutputQ": "-22329",
+          "codeOutputQ": "-22329",
+          "storageOutputQ": "-22329",
+          "codeEstimatedGas": "644525",
+          "storageEstimatedGas": "597260"
+        },
+        {
+          "featuresQ": [
+            2103,
+            -2722
+          ],
+          "packedFeatures": "0x370800005ef5ffff",
+          "referenceOutputQ": "-19570",
+          "codeOutputQ": "-19570",
+          "storageOutputQ": "-19570",
+          "codeEstimatedGas": "644455",
+          "storageEstimatedGas": "597190"
+        },
+        {
+          "featuresQ": [
+            -1077,
+            -2103
+          ],
+          "packedFeatures": "0xcbfbffffc9f7ffff",
+          "referenceOutputQ": "-21368",
+          "codeOutputQ": "-21368",
+          "storageOutputQ": "-21368",
+          "codeEstimatedGas": "644511",
+          "storageEstimatedGas": "597246"
+        },
+        {
+          "featuresQ": [
+            2839,
+            2399
+          ],
+          "packedFeatures": "0x170b00005f090000",
+          "referenceOutputQ": "-15788",
+          "codeOutputQ": "-15788",
+          "storageOutputQ": "-15788",
+          "codeEstimatedGas": "644382",
+          "storageEstimatedGas": "599117"
+        },
+        {
+          "featuresQ": [
+            696,
+            -1274
+          ],
+          "packedFeatures": "0xb802000006fbffff",
+          "referenceOutputQ": "-17586",
+          "codeOutputQ": "-17586",
+          "storageOutputQ": "-17586",
+          "codeEstimatedGas": "644432",
+          "storageEstimatedGas": "597167"
+        },
+        {
+          "featuresQ": [
+            1395,
+            -1217
+          ],
+          "packedFeatures": "0x730500003ffbffff",
+          "referenceOutputQ": "-17524",
+          "codeOutputQ": "-17524",
+          "storageOutputQ": "-17524",
+          "codeEstimatedGas": "644431",
+          "storageEstimatedGas": "597166"
+        },
+        {
+          "featuresQ": [
+            989,
+            -2055
+          ],
+          "packedFeatures": "0xdd030000f9f7ffff",
+          "referenceOutputQ": "-18764",
+          "codeOutputQ": "-18764",
+          "storageOutputQ": "-18764",
+          "codeEstimatedGas": "644447",
+          "storageEstimatedGas": "597182"
+        },
+        {
+          "featuresQ": [
+            2454,
+            -63
+          ],
+          "packedFeatures": "0x96090000c1ffffff",
+          "referenceOutputQ": "-15943",
+          "codeOutputQ": "-15943",
+          "storageOutputQ": "-15943",
+          "codeEstimatedGas": "644410",
+          "storageEstimatedGas": "597145"
+        },
+        {
+          "featuresQ": [
+            1591,
+            -2073
+          ],
+          "packedFeatures": "0x37060000e7f7ffff",
+          "referenceOutputQ": "-18795",
+          "codeOutputQ": "-18795",
+          "storageOutputQ": "-18795",
+          "codeEstimatedGas": "644447",
+          "storageEstimatedGas": "597182"
+        }
+      ]
+    },
+    {
+      "trees": 50,
+      "depth": 4,
+      "modelId": "0x0a3157b5850f5246df7f5bf46ae1a8892ce1b96945bf76bfe1ce18896e8fe0f6",
+      "coreBytes": 9224,
+      "coreSha256": "bf48b91a237d019e0373dfec044d29d1a963d45fb0cea4fdbbe1285d276d742c",
+      "chunks": 1,
+      "materializedData": {
+        "codeBytesIncludingMagicAndPointerTable": 9264,
+        "solidityStorageSlots": 290,
+        "solidityStorageBytes": 9280
+      },
+      "perModelGas": {
+        "codeChunkWriteReceipts": [
+          "2014181"
+        ],
+        "codeTableWriteReceipt": "63383",
+        "codeMaterialization": "2077564",
+        "storageMaterialization": "6564308",
+        "commonRegistryRegistration": "689237",
+        "storageToCodeMaterializationRatio": 3.159617706121207
+      },
+      "inferenceEstimates": {
+        "code": {
+          "min": 810689,
+          "max": 810888,
+          "mean": 810777.4166666666,
+          "median": 810756.5
+        },
+        "storage": {
+          "min": 773967,
+          "max": 796041,
+          "mean": 783888.75,
+          "median": 785091
+        },
+        "storageToCodeMeanRatio": 0.9668359452126658
+      },
+      "observations": [
+        {
+          "featuresQ": [
+            -2652,
+            -1521
+          ],
+          "packedFeatures": "0xa4f5ffff0ffaffff",
+          "referenceOutputQ": "-19570",
+          "codeOutputQ": "-19570",
+          "storageOutputQ": "-19570",
+          "codeEstimatedGas": "810888",
+          "storageEstimatedGas": "778166"
+        },
+        {
+          "featuresQ": [
+            -1548,
+            904
+          ],
+          "packedFeatures": "0xf4f9ffff88030000",
+          "referenceOutputQ": "-7945",
+          "codeOutputQ": "-7945",
+          "storageOutputQ": "-7945",
+          "codeEstimatedGas": "810754",
+          "storageEstimatedGas": "776032"
+        },
+        {
+          "featuresQ": [
+            -1705,
+            1096
+          ],
+          "packedFeatures": "0x57f9ffff48040000",
+          "referenceOutputQ": "-8441",
+          "codeOutputQ": "-8441",
+          "storageOutputQ": "-8441",
+          "codeEstimatedGas": "810755",
+          "storageEstimatedGas": "776033"
+        },
+        {
+          "featuresQ": [
+            -1395,
+            -2162
+          ],
+          "packedFeatures": "0x8dfaffff8ef7ffff",
+          "referenceOutputQ": "-17958",
+          "codeOutputQ": "-17958",
+          "storageOutputQ": "-17958",
+          "codeEstimatedGas": "810880",
+          "storageEstimatedGas": "784158"
+        },
+        {
+          "featuresQ": [
+            2103,
+            -2722
+          ],
+          "packedFeatures": "0x370800005ef5ffff",
+          "referenceOutputQ": "-10983",
+          "codeOutputQ": "-10983",
+          "storageOutputQ": "-10983",
+          "codeEstimatedGas": "810763",
+          "storageEstimatedGas": "796041"
+        },
+        {
+          "featuresQ": [
+            -1077,
+            -2103
+          ],
+          "packedFeatures": "0xcbfbffffc9f7ffff",
+          "referenceOutputQ": "-15850",
+          "codeOutputQ": "-15850",
+          "storageOutputQ": "-15850",
+          "codeEstimatedGas": "810860",
+          "storageEstimatedGas": "788138"
+        },
+        {
+          "featuresQ": [
+            2839,
+            2399
+          ],
+          "packedFeatures": "0x170b00005f090000",
+          "referenceOutputQ": "-3388",
+          "codeOutputQ": "-3388",
+          "storageOutputQ": "-3388",
+          "codeEstimatedGas": "810689",
+          "storageEstimatedGas": "773967"
+        },
+        {
+          "featuresQ": [
+            696,
+            -1274
+          ],
+          "packedFeatures": "0xb802000006fbffff",
+          "referenceOutputQ": "-7387",
+          "codeOutputQ": "-7387",
+          "storageOutputQ": "-7387",
+          "codeEstimatedGas": "810752",
+          "storageEstimatedGas": "786030"
+        },
+        {
+          "featuresQ": [
+            1395,
+            -1217
+          ],
+          "packedFeatures": "0x730500003ffbffff",
+          "referenceOutputQ": "-7108",
+          "codeOutputQ": "-7108",
+          "storageOutputQ": "-7108",
+          "codeEstimatedGas": "810746",
+          "storageEstimatedGas": "786024"
+        },
+        {
+          "featuresQ": [
+            989,
+            -2055
+          ],
+          "packedFeatures": "0xdd030000f9f7ffff",
+          "referenceOutputQ": "-9464",
+          "codeOutputQ": "-9464",
+          "storageOutputQ": "-9464",
+          "codeEstimatedGas": "810758",
+          "storageEstimatedGas": "794036"
+        },
+        {
+          "featuresQ": [
+            2454,
+            -63
+          ],
+          "packedFeatures": "0x96090000c1ffffff",
+          "referenceOutputQ": "-3977",
+          "codeOutputQ": "-3977",
+          "storageOutputQ": "-3977",
+          "codeEstimatedGas": "810726",
+          "storageEstimatedGas": "774004"
+        },
+        {
+          "featuresQ": [
+            1591,
+            -2073
+          ],
+          "packedFeatures": "0x37060000e7f7ffff",
+          "referenceOutputQ": "-9526",
+          "codeOutputQ": "-9526",
+          "storageOutputQ": "-9526",
+          "codeEstimatedGas": "810758",
+          "storageEstimatedGas": "794036"
+        }
+      ]
+    },
+    {
+      "trees": 100,
+      "depth": 4,
+      "modelId": "0xd87a6bbc8ec2449f001677bbe028c76447c6b6c28813ef99eb26251840533922",
+      "coreBytes": 18424,
+      "coreSha256": "0b194fdcd4add43e1e3997fcad35f74c9df73610162a8267305b165425eda293",
+      "chunks": 1,
+      "materializedData": {
+        "codeBytesIncludingMagicAndPointerTable": 18464,
+        "solidityStorageSlots": 577,
+        "solidityStorageBytes": 18464
+      },
+      "perModelGas": {
+        "codeChunkWriteReceipts": [
+          "3939971"
+        ],
+        "codeTableWriteReceipt": "63383",
+        "codeMaterialization": "4003354",
+        "storageMaterialization": "13011602",
+        "commonRegistryRegistration": "689249",
+        "storageToCodeMaterializationRatio": 3.2501752280712624
+      },
+      "inferenceEstimates": {
+        "code": {
+          "min": 1576732,
+          "max": 1577114,
+          "mean": 1576944.5,
+          "median": 1576939.5
+        },
+        "storage": {
+          "min": 1503570,
+          "max": 1545723,
+          "mean": 1518782.5,
+          "median": 1517791.5
+        },
+        "storageToCodeMeanRatio": 0.9631172815530287
+      },
+      "observations": [
+        {
+          "featuresQ": [
+            -2652,
+            -1521
+          ],
+          "packedFeatures": "0xa4f5ffff0ffaffff",
+          "referenceOutputQ": "-3783",
+          "codeOutputQ": "-3783",
+          "storageOutputQ": "-3783",
+          "codeEstimatedGas": "1577114",
+          "storageEstimatedGas": "1503952"
+        },
+        {
+          "featuresQ": [
+            -1548,
+            904
+          ],
+          "packedFeatures": "0xf4f9ffff88030000",
+          "referenceOutputQ": "13081",
+          "codeOutputQ": "13081",
+          "storageOutputQ": "13081",
+          "codeEstimatedGas": "1576943",
+          "storageEstimatedGas": "1503781"
+        },
+        {
+          "featuresQ": [
+            -1705,
+            1096
+          ],
+          "packedFeatures": "0x57f9ffff48040000",
+          "referenceOutputQ": "13608",
+          "codeOutputQ": "13608",
+          "storageOutputQ": "13608",
+          "codeEstimatedGas": "1576936",
+          "storageEstimatedGas": "1505774"
+        },
+        {
+          "featuresQ": [
+            -1395,
+            -2162
+          ],
+          "packedFeatures": "0x8dfaffff8ef7ffff",
+          "referenceOutputQ": "-2171",
+          "codeOutputQ": "-2171",
+          "storageOutputQ": "-2171",
+          "codeEstimatedGas": "1577106",
+          "storageEstimatedGas": "1509944"
+        },
+        {
+          "featuresQ": [
+            2103,
+            -2722
+          ],
+          "packedFeatures": "0x370800005ef5ffff",
+          "referenceOutputQ": "17142",
+          "codeOutputQ": "17142",
+          "storageOutputQ": "17142",
+          "codeEstimatedGas": "1576885",
+          "storageEstimatedGas": "1545723"
+        },
+        {
+          "featuresQ": [
+            -1077,
+            -2103
+          ],
+          "packedFeatures": "0xcbfbffffc9f7ffff",
+          "referenceOutputQ": "-63",
+          "codeOutputQ": "-63",
+          "storageOutputQ": "-63",
+          "codeEstimatedGas": "1577086",
+          "storageEstimatedGas": "1513924"
+        },
+        {
+          "featuresQ": [
+            2839,
+            2399
+          ],
+          "packedFeatures": "0x170b00005f090000",
+          "referenceOutputQ": "14740",
+          "codeOutputQ": "14740",
+          "storageOutputQ": "14740",
+          "codeEstimatedGas": "1576732",
+          "storageEstimatedGas": "1503570"
+        },
+        {
+          "featuresQ": [
+            696,
+            -1274
+          ],
+          "packedFeatures": "0xb802000006fbffff",
+          "referenceOutputQ": "12678",
+          "codeOutputQ": "12678",
+          "storageOutputQ": "12678",
+          "codeEstimatedGas": "1576951",
+          "storageEstimatedGas": "1521789"
+        },
+        {
+          "featuresQ": [
+            1395,
+            -1217
+          ],
+          "packedFeatures": "0x730500003ffbffff",
+          "referenceOutputQ": "17049",
+          "codeOutputQ": "17049",
+          "storageOutputQ": "17049",
+          "codeEstimatedGas": "1576908",
+          "storageEstimatedGas": "1527746"
+        },
+        {
+          "featuresQ": [
+            989,
+            -2055
+          ],
+          "packedFeatures": "0xdd030000f9f7ffff",
+          "referenceOutputQ": "12244",
+          "codeOutputQ": "12244",
+          "storageOutputQ": "12244",
+          "codeEstimatedGas": "1576943",
+          "storageEstimatedGas": "1531781"
+        },
+        {
+          "featuresQ": [
+            2454,
+            -63
+          ],
+          "packedFeatures": "0x96090000c1ffffff",
+          "referenceOutputQ": "18531",
+          "codeOutputQ": "18531",
+          "storageOutputQ": "18531",
+          "codeEstimatedGas": "1576821",
+          "storageEstimatedGas": "1521659"
+        },
+        {
+          "featuresQ": [
+            1591,
+            -2073
+          ],
+          "packedFeatures": "0x37060000e7f7ffff",
+          "referenceOutputQ": "15623",
+          "codeOutputQ": "15623",
+          "storageOutputQ": "15623",
+          "codeEstimatedGas": "1576909",
+          "storageEstimatedGas": "1535747"
+        }
+      ]
+    },
+    {
+      "trees": 200,
+      "depth": 4,
+      "modelId": "0xd53a54b4b0f4fba537775fa5ece0ac2904a1ea49666767fc34c369a5c9d6829b",
+      "coreBytes": 36824,
+      "coreSha256": "41a7fe355beeb342e8fee25a6e1d1a07fdc10ae650325edfe1fcc8cba57b65a3",
+      "chunks": 2,
+      "materializedData": {
+        "codeBytesIncludingMagicAndPointerTable": 36900,
+        "solidityStorageSlots": 1152,
+        "solidityStorageBytes": 36864
+      },
+      "perModelGas": {
+        "codeChunkWriteReceipts": [
+          "4273664",
+          "3607380"
+        ],
+        "codeTableWriteReceipt": "70168",
+        "codeMaterialization": "7951212",
+        "storageMaterialization": "25961924",
+        "commonRegistryRegistration": "689261",
+        "storageToCodeMaterializationRatio": 3.265153035788758
+      },
+      "inferenceEstimates": {
+        "code": {
+          "min": 3120837,
+          "max": 3121528,
+          "mean": 3121210.4166666665,
+          "median": 3121197
+        },
+        "storage": {
+          "min": 2962802,
+          "max": 3041069,
+          "mean": 2992508.75,
+          "median": 2990192
+        },
+        "storageToCodeMeanRatio": 0.958765462918032
+      },
+      "observations": [
+        {
+          "featuresQ": [
+            -2652,
+            -1521
+          ],
+          "packedFeatures": "0xa4f5ffff0ffaffff",
+          "referenceOutputQ": "-18213",
+          "codeOutputQ": "-18213",
+          "storageOutputQ": "-18213",
+          "codeEstimatedGas": "3121528",
+          "storageEstimatedGas": "2965493"
+        },
+        {
+          "featuresQ": [
+            -1548,
+            904
+          ],
+          "packedFeatures": "0xf4f9ffff88030000",
+          "referenceOutputQ": "15887",
+          "codeOutputQ": "15887",
+          "storageOutputQ": "15887",
+          "codeEstimatedGas": "3121204",
+          "storageEstimatedGas": "2963169"
+        },
+        {
+          "featuresQ": [
+            -1705,
+            1096
+          ],
+          "packedFeatures": "0x57f9ffff48040000",
+          "referenceOutputQ": "17034",
+          "codeOutputQ": "17034",
+          "storageOutputQ": "17034",
+          "codeEstimatedGas": "3121190",
+          "storageEstimatedGas": "2967155"
+        },
+        {
+          "featuresQ": [
+            -1395,
+            -2162
+          ],
+          "packedFeatures": "0x8dfaffff8ef7ffff",
+          "referenceOutputQ": "-14648",
+          "codeOutputQ": "-14648",
+          "storageOutputQ": "-14648",
+          "codeEstimatedGas": "3121509",
+          "storageEstimatedGas": "2975474"
+        },
+        {
+          "featuresQ": [
+            2103,
+            -2722
+          ],
+          "packedFeatures": "0x370800005ef5ffff",
+          "referenceOutputQ": "22242",
+          "codeOutputQ": "22242",
+          "storageOutputQ": "22242",
+          "codeEstimatedGas": "3121104",
+          "storageEstimatedGas": "3041069"
+        },
+        {
+          "featuresQ": [
+            -1077,
+            -2103
+          ],
+          "packedFeatures": "0xcbfbffffc9f7ffff",
+          "referenceOutputQ": "-10370",
+          "codeOutputQ": "-10370",
+          "storageOutputQ": "-10370",
+          "codeEstimatedGas": "3121468",
+          "storageEstimatedGas": "2981433"
+        },
+        {
+          "featuresQ": [
+            2839,
+            2399
+          ],
+          "packedFeatures": "0x170b00005f090000",
+          "referenceOutputQ": "25521",
+          "codeOutputQ": "25521",
+          "storageOutputQ": "25521",
+          "codeEstimatedGas": "3120837",
+          "storageEstimatedGas": "2962802"
+        },
+        {
+          "featuresQ": [
+            696,
+            -1274
+          ],
+          "packedFeatures": "0xb802000006fbffff",
+          "referenceOutputQ": "15143",
+          "codeOutputQ": "15143",
+          "storageOutputQ": "15143",
+          "codeEstimatedGas": "3121218",
+          "storageEstimatedGas": "2999183"
+        },
+        {
+          "featuresQ": [
+            1395,
+            -1217
+          ],
+          "packedFeatures": "0x730500003ffbffff",
+          "referenceOutputQ": "23606",
+          "codeOutputQ": "23606",
+          "storageOutputQ": "23606",
+          "codeEstimatedGas": "3121137",
+          "storageEstimatedGas": "3009102"
+        },
+        {
+          "featuresQ": [
+            989,
+            -2055
+          ],
+          "packedFeatures": "0xdd030000f9f7ffff",
+          "referenceOutputQ": "14027",
+          "codeOutputQ": "14027",
+          "storageOutputQ": "14027",
+          "codeEstimatedGas": "3121206",
+          "storageEstimatedGas": "3017171"
+        },
+        {
+          "featuresQ": [
+            2454,
+            -63
+          ],
+          "packedFeatures": "0x96090000c1ffffff",
+          "referenceOutputQ": "29721",
+          "codeOutputQ": "29721",
+          "storageOutputQ": "29721",
+          "codeEstimatedGas": "3120986",
+          "storageEstimatedGas": "2998951"
+        },
+        {
+          "featuresQ": [
+            1591,
+            -2073
+          ],
+          "packedFeatures": "0x37060000e7f7ffff",
+          "referenceOutputQ": "21033",
+          "codeOutputQ": "21033",
+          "storageOutputQ": "21033",
+          "codeEstimatedGas": "3121138",
+          "storageEstimatedGas": "3029103"
+        }
+      ]
+    },
+    {
+      "trees": 50,
+      "depth": 6,
+      "modelId": "0x7fc4fe7c97e6ffb118d188830b9873946ab5c16adc901cdb223ce9f467a0505d",
+      "coreBytes": 38024,
+      "coreSha256": "55da404cf0014c7c43f1edc2c24320adcb395968c4d43704bdcdceb302f33d4d",
+      "chunks": 2,
+      "materializedData": {
+        "codeBytesIncludingMagicAndPointerTable": 38100,
+        "solidityStorageSlots": 1190,
+        "solidityStorageBytes": 38080
+      },
+      "perModelGas": {
+        "codeChunkWriteReceipts": [
+          "4275368",
+          "3858827"
+        ],
+        "codeTableWriteReceipt": "70168",
+        "codeMaterialization": "8204363",
+        "storageMaterialization": "26817344",
+        "commonRegistryRegistration": "689249",
+        "storageToCodeMaterializationRatio": 3.2686686339938884
+      },
+      "inferenceEstimates": {
+        "code": {
+          "min": 1146275,
+          "max": 1146566,
+          "mean": 1146414.4166666667,
+          "median": 1146390.5
+        },
+        "storage": {
+          "min": 1125670,
+          "max": 1157921,
+          "mean": 1149476.0833333333,
+          "median": 1149788.5
+        },
+        "storageToCodeMeanRatio": 1.0026706456427585
+      },
+      "observations": [
+        {
+          "featuresQ": [
+            -2652,
+            -1521
+          ],
+          "packedFeatures": "0xa4f5ffff0ffaffff",
+          "referenceOutputQ": "-212",
+          "codeOutputQ": "-212",
+          "storageOutputQ": "-212",
+          "codeEstimatedGas": "1146566",
+          "storageEstimatedGas": "1147961"
+        },
+        {
+          "featuresQ": [
+            -1548,
+            904
+          ],
+          "packedFeatures": "0xf4f9ffff88030000",
+          "referenceOutputQ": "-7849",
+          "codeOutputQ": "-7849",
+          "storageOutputQ": "-7849",
+          "codeEstimatedGas": "1146388",
+          "storageEstimatedGas": "1155783"
+        },
+        {
+          "featuresQ": [
+            -1705,
+            1096
+          ],
+          "packedFeatures": "0x57f9ffff48040000",
+          "referenceOutputQ": "-5862",
+          "codeOutputQ": "-5862",
+          "storageOutputQ": "-5862",
+          "codeEstimatedGas": "1146391",
+          "storageEstimatedGas": "1149786"
+        },
+        {
+          "featuresQ": [
+            -1395,
+            -2162
+          ],
+          "packedFeatures": "0x8dfaffff8ef7ffff",
+          "referenceOutputQ": "2451",
+          "codeOutputQ": "2451",
+          "storageOutputQ": "2451",
+          "codeEstimatedGas": "1146551",
+          "storageEstimatedGas": "1151946"
+        },
+        {
+          "featuresQ": [
+            2103,
+            -2722
+          ],
+          "packedFeatures": "0x370800005ef5ffff",
+          "referenceOutputQ": "-11656",
+          "codeOutputQ": "-11656",
+          "storageOutputQ": "-11656",
+          "codeEstimatedGas": "1146390",
+          "storageEstimatedGas": "1145785"
+        },
+        {
+          "featuresQ": [
+            -1077,
+            -2103
+          ],
+          "packedFeatures": "0xcbfbffffc9f7ffff",
+          "referenceOutputQ": "-2969",
+          "codeOutputQ": "-2969",
+          "storageOutputQ": "-2969",
+          "codeEstimatedGas": "1146526",
+          "storageEstimatedGas": "1157921"
+        },
+        {
+          "featuresQ": [
+            2839,
+            2399
+          ],
+          "packedFeatures": "0x170b00005f090000",
+          "referenceOutputQ": "-29224",
+          "codeOutputQ": "-29224",
+          "storageOutputQ": "-29224",
+          "codeEstimatedGas": "1146275",
+          "storageEstimatedGas": "1125670"
+        },
+        {
+          "featuresQ": [
+            696,
+            -1274
+          ],
+          "packedFeatures": "0xb802000006fbffff",
+          "referenceOutputQ": "-15808",
+          "codeOutputQ": "-15808",
+          "storageOutputQ": "-15808",
+          "codeEstimatedGas": "1146386",
+          "storageEstimatedGas": "1157781"
+        },
+        {
+          "featuresQ": [
+            1395,
+            -1217
+          ],
+          "packedFeatures": "0x730500003ffbffff",
+          "referenceOutputQ": "-18043",
+          "codeOutputQ": "-18043",
+          "storageOutputQ": "-18043",
+          "codeEstimatedGas": "1146369",
+          "storageEstimatedGas": "1149764"
+        },
+        {
+          "featuresQ": [
+            989,
+            -2055
+          ],
+          "packedFeatures": "0xdd030000f9f7ffff",
+          "referenceOutputQ": "-6572",
+          "codeOutputQ": "-6572",
+          "storageOutputQ": "-6572",
+          "codeEstimatedGas": "1146408",
+          "storageEstimatedGas": "1151803"
+        },
+        {
+          "featuresQ": [
+            2454,
+            -63
+          ],
+          "packedFeatures": "0x96090000c1ffffff",
+          "referenceOutputQ": "-28508",
+          "codeOutputQ": "-28508",
+          "storageOutputQ": "-28508",
+          "codeEstimatedGas": "1146327",
+          "storageEstimatedGas": "1149722"
+        },
+        {
+          "featuresQ": [
+            1591,
+            -2073
+          ],
+          "packedFeatures": "0x37060000e7f7ffff",
+          "referenceOutputQ": "-6231",
+          "codeOutputQ": "-6231",
+          "storageOutputQ": "-6231",
+          "codeEstimatedGas": "1146396",
+          "storageEstimatedGas": "1149791"
+        }
+      ]
+    }
+  ],
+  "threeWayComparisons": 72,
+  "referenceEvmComparisons": 144,
+  "mismatches": 0,
+  "limitations": [
+    "One synthetic scalar family, compiler, local EVM client, hardfork and chunk size; not a live-network fee forecast.",
+    "This is a controlled implemented-backend comparison, not a universal gas lower bound or a comparison with all storage encodings.",
+    "Both paths retain canonical byte packing. The baseline does not use per-node Solidity structs or sparse model compression.",
+    "The baseline implements only free scalar inference and storage writes; production shared deployment includes additional functionality, so shared deployment costs are not used for a relative efficiency claim.",
+    "The common registry still carries code-backend pointer metadata. Its registration receipt is reported separately, not attributed to either materialization path.",
+    "The benchmark verifies bytes and outputs, not access control, malformed-input handling, model quality or production readiness of the comparator."
+  ]
+}

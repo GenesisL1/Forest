@@ -34,10 +34,10 @@ A browser studio and command-line toolchain for:
 - local or EVM integer inference; and
 - optional marketplace discovery and paid contract calls.
 
-## Research paper v0.2.3
+## Research paper
 
-The canonical [research paper](GL1F.pdf) is a single-column technical report
-released on 5 September 2026. It has not been peer reviewed. The
+The canonical [research paper](GL1F.pdf) is a single-column author manuscript
+revised on 6 September 2026. It has not been peer reviewed. The
 [reproducibility guide](REPRODUCIBILITY.md), [format specification](FORMAT_SPEC.md),
 tests, and checked-in result records define the public evidence boundary.
 

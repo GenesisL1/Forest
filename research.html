@@ -30,14 +30,14 @@ SOFTWARE.
   <meta name="keywords" content="GL1F, GenesisL1, deterministic machine learning, gradient-boosted trees, EVM inference, reproducible computing, DeSci" />
   <meta name="author" content="Mikhail Fedorov" />
   <meta name="version" content="0.2.3" />
-  <meta name="citation_title" content="Artifact-to-Execution Assurance for Canonical Integer GBDTs on the EVM" />
+  <meta name="citation_title" content="GL1F: Reproducible Integer Tree-Ensemble Inference on the EVM" />
   <meta name="citation_author" content="Mikhail Fedorov" />
-  <meta name="citation_publication_date" content="2026-09-05" />
+  <meta name="citation_publication_date" content="2026-09-06" />
   <meta name="citation_pdf_url" content="https://gl1f.com/GL1F.pdf" />
   <meta name="robots" content="index,follow" />
   <meta name="theme-color" content="#f8fafc" />
 
-  <meta property="og:title" content="GL1F Research — Artifact-to-Execution Assurance" />
+  <meta property="og:title" content="GL1F Research — Reproducible Integer Inference" />
   <meta property="og:description" content="GL1F v0.2.3 public research paper, source, proofs, and scoped evaluation evidence. Not peer reviewed." />
   <meta property="og:type" content="article" />
   <meta property="og:site_name" content="GenesisL1 Forest" />
@@ -45,7 +45,7 @@ SOFTWARE.
   <meta property="og:image" content="https://genesisl1.com/logo.svg" />
 
   <meta name="twitter:card" content="summary" />
-  <meta name="twitter:title" content="GL1F Research — Artifact-to-Execution Assurance" />
+  <meta name="twitter:title" content="GL1F Research — Reproducible Integer Inference" />
   <meta name="twitter:description" content="GL1F v0.2.3 public research paper, source, proofs, and scoped evaluation evidence. Not peer reviewed." />
   <meta name="twitter:image" content="https://genesisl1.com/logo.svg" />
 
@@ -53,11 +53,11 @@ SOFTWARE.
     {
       "@context": "https://schema.org",
       "@type": "TechArticle",
-      "headline": "Artifact-to-Execution Assurance for Canonical Integer GBDTs on the EVM",
+      "headline": "GL1F: Reproducible Integer Tree-Ensemble Inference on the EVM",
       "datePublished": "2026-09-05",
-      "dateModified": "2026-09-05",
+      "dateModified": "2026-09-06",
       "version": "0.2.3",
-      "creativeWorkStatus": "Public technical report; not peer reviewed",
+      "creativeWorkStatus": "Author manuscript; not peer reviewed",
       "author": {
         "@type": "Person",
         "name": "Mikhail Fedorov"
@@ -115,9 +115,9 @@ SOFTWARE.
       <section class="research-hero" aria-labelledby="research-title">
         <div class="research-kicker">
           <span class="status-dot" aria-hidden="true"></span>
-          Public technical report v0.2.3 · Not peer reviewed
+          Author manuscript · Not peer reviewed
         </div>
-        <h1 id="research-title">Artifact-to-execution assurance for canonical integer GBDTs</h1>
+        <h1 id="research-title">Reproducible integer tree-ensemble inference on the EVM</h1>
         <p class="research-lead">
           GL1F serializes integer-quantized gradient-boosted trees into a
           canonical binary form that can be reconstructed from chain state and
@@ -136,7 +136,7 @@ SOFTWARE.
           <span>Canonical GL1F format</span>
           <span>Integer EVM traversal</span>
           <span>Public model bytes</span>
-          <span>Released 5 September 2026</span>
+          <span>Revised 6 September 2026</span>
           <span>Software: MIT</span>
         </div>
       </section>
@@ -144,10 +144,10 @@ SOFTWARE.
       <section class="evidence-strip" aria-labelledby="evidence-title">
         <div class="section-heading">
           <div>
-            <p class="eyebrow">Number-pinned provider observation</p>
+            <p class="eyebrow">Archived provider observation</p>
             <h2 id="evidence-title">A research record with documented scope and verification paths</h2>
           </div>
-          <p class="record-state" id="evidenceState" role="status">Recorded provider summary</p>
+          <p class="record-state" id="evidenceState" role="status">Archived deployment observation</p>
         </div>
 
         <div class="research-metrics">
@@ -164,7 +164,7 @@ SOFTWARE.
             <span class="metric-label">matching local/provider-call results</span>
           </article>
           <article class="metric-card">
-            <span class="metric-value" id="witnessBlock">13,342,043</span>
+            <span class="metric-value" id="witnessBlock">13,602,838</span>
             <span class="metric-label">number-pinned provider block</span>
           </article>
         </div>
@@ -172,10 +172,11 @@ SOFTWARE.
         <div class="block-record">
           <div>
             <span class="record-label">Reported block hash</span>
-            <code id="blockHash">0xffd825db1bb2534052a604db9584d361111d8bc9e19d753b0ee3861bf320d1b9</code>
+            <code id="blockHash">0xfd3da1020c37ee3c1fe7cd0a6060dbc5ec3ec5fb90c0b812256dc33e467dace3</code>
           </div>
           <div class="record-links">
-            <a href="./benchmarks/results/LIVE_CHAIN_WITNESS_EXTENDED_V2.md">Historical summary</a>
+            <a href="./benchmarks/results/live_chain_replay_13602838.json">Replay result</a>
+            <a href="./benchmarks/results/live_chain_archive_13602838.tar.gz">Evidence archive</a>
             <a href="./REPRODUCIBILITY.md">Verification guide</a>
             <a href="./docs/DEPLOYED_SYSTEM.md">Deployment notes</a>
           </div>
@@ -238,8 +239,9 @@ SOFTWARE.
                 <li>Specification-level integer inference is equivalent under the stated reconstruction and execution premises.</li>
                 <li>Twenty-five distinct recorded training profiles produced identical JavaScript, Python, and C++ cores; a separate arithmetic witness exercises the operation-order boundary.</li>
                 <li>The six-shape scalar EVM sweep produced 72/72 exact reference/runtime outputs.</li>
+                <li>A controlled comparison used identical models in code-as-data and packed Solidity storage, with 72 matching three-way output comparisons.</li>
                 <li>All 12 active records at the pinned block passed the documented reconstruction checks.</li>
-                <li>For the pinned provider-attested record, nine deterministic vectors per active model yielded 108/108 matching local and returned call results.</li>
+                <li>For the archived provider-reported record, nine deterministic vectors per active model yielded 108/108 matching local and returned call results.</li>
               </ul>
             </div>
           </article>
@@ -321,7 +323,7 @@ SOFTWARE.
           </table>
         </div>
         <p class="table-note" id="manifestNote">
-          Runtime sizes and dual code digests were observed at block
+          Runtime sizes and dual code digests in the deployment manifest were observed at block
           13,342,043. They identify deployed bytes, but do not assert that
           local source builds reproduce them byte-for-byte.
         </p>

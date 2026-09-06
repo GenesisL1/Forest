@@ -1,0 +1,72 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{ledger-manuscript}[2026/09/06 GL1F author manuscript settings]
+
+% Uses Ledger's author-template class and bibliography style:
+% https://ledgerjournal.org/ojs/ledger/about/submissions
+% https://ledger.pitt.edu/ojs/ledger/libraryFiles/downloadPublic/2
+% The template's sample publication metadata and under-consideration logo are
+% not applicable to an author manuscript that has not been submitted.
+
+\RequirePackage[T1]{fontenc}
+\RequirePackage{courier}
+\RequirePackage{xurl}
+\hypersetup{hidelinks}
+\urlstyle{same}
+\AtBeginDocument{\urlstyle{same}}
+% The upstream header uses a raised logo; plain text needs a positive gap.
+\geometry{headheight=12pt,headsep=8pt}
+% Keep the centered affiliation rule within the footnote area's dimensions.
+\renewcommand{\footnoterule}{\kern-3pt
+  \hbox to\textwidth{\hfil\rule{0.75\textwidth}{0.6pt}\hfil}\kern2.4pt}
+
+% Restore standard optional list labels; the upstream keyword helper replaces
+% \item globally and interferes with ordinary lists and bibliography entries.
+\let\item\olditem
+
+% Preserve Ledger's symbol order without the upstream negative kern, which
+% makes consecutive corresponding-author and affiliation marks overlap.
+\makeatletter
+\renewcommand*{\@fnsymbol}[1]{\ensuremath{%
+  \ifcase#1\or *\or\dagger\or\ddagger\or\mathsection\or\mathparagraph
+  \or\dagger\dagger\or\ddagger\ddagger\or\mathsection\mathsection
+  \or\mathparagraph\mathparagraph\else\@ctrerr\fi}}
+% titling additionally sets title marks in zero-width \rlap boxes. Give each
+% mark its natural width after titling installs that local definition.
+\renewcommand{\maketitlehookb}{%
+  \def\@makefnmark{\hbox{\@textsuperscript{\normalfont
+    \@bsthanksheadpre\tamark\@bsthanksheadpost}}}}
+\makeatother
+
+\pretitle{\centering\fontsize{10pt}{13pt}\selectfont
+  RESEARCH ARTICLE\par\vspace{6pt}\fontsize{24pt}{28pt}\selectfont}
+\predate{}
+\date{}
+\postdate{}
+
+\fancypagestyle{pagefirst}{%
+  \fancyhf{}%
+  \fancyfoot[C]{\fontsize{8pt}{10pt}\selectfont
+    Author manuscript, 6 September 2026; not peer reviewed}%
+  \renewcommand{\headrulewidth}{0pt}%
+  \renewcommand{\footrulewidth}{0pt}%
+}
+\fancypagestyle{pagemain}{%
+  \fancyhf{}%
+  \fancyhead[L]{\fontsize{8pt}{10pt}\selectfont GL1F}%
+  \fancyhead[R]{\fontsize{8pt}{10pt}\selectfont Author manuscript}%
+  \fancyfoot[C]{\fontsize{10pt}{12pt}\selectfont\thepage}%
+  \renewcommand{\headrulewidth}{0pt}%
+  \renewcommand{\footrulewidth}{0pt}%
+}
+\fancypagestyle{pagelast}{%
+  \fancyhf{}%
+  \fancyhead[L]{\fontsize{8pt}{10pt}\selectfont GL1F}%
+  \fancyhead[R]{\fontsize{8pt}{10pt}\selectfont Author manuscript}%
+  \fancyfoot[C]{\fontsize{10pt}{12pt}\selectfont\thepage}%
+  \renewcommand{\headrulewidth}{0pt}%
+  \renewcommand{\footrulewidth}{0pt}%
+}
+\pagestyle{pagemain}
+\AtBeginDocument{\normalsize}
+
+\endinput

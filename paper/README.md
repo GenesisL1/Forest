@@ -1,30 +1,34 @@
 # GL1F research paper
 
-This directory contains the source of:
+**GL1F: Reproducible Integer Tree-Ensemble Inference on the EVM**
+Mikhail Fedorov. Author manuscript, 6 September 2026; not peer reviewed.
 
-**Artifact-to-Execution Assurance for Canonical Integer GBDTs on the EVM**
-Mikhail Fedorov, technical report v0.2.3, 5 September 2026.
-
-The canonical paper is [`../GL1F.pdf`](../GL1F.pdf). The formal supplement is
-[`GL1F_Formal_Supplement.pdf`](GL1F_Formal_Supplement.pdf).
+The manuscript is [`../GL1F.pdf`](../GL1F.pdf). Supplementary methods and
+proofs are in [`GL1F_Formal_Supplement.pdf`](GL1F_Formal_Supplement.pdf).
+The manuscript uses Ledger's author-template typography and bibliography
+style. Publication metadata are omitted because the article has not been
+accepted or published by the journal. Template provenance is recorded in
+[`../THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md).
 
 ## Build
 
-From the repository root:
+From the repository root, with TeX Live and latexmk installed:
 
 ```bash
 make pdfs
 ```
 
-The build uses `main.tex`, `architecture.tex`, `references.bib`,
-`supplement.tex`, and `formal_results.tex`. It writes the two PDFs named above.
+`main.tex`, `architecture.tex`, `references.bib`, `ledger.cls`,
+`ledger-manuscript.sty`, and `ledgerbib.bst` build the main article.
+`supplement.tex` and `formal_results.tex` build the supplement.
 
-## Executable evidence
+## Reproduce the evidence
 
 ```bash
 npm ci
 make verify
+node benchmarks/storage_comparison.mjs
 ```
 
-See [`../REPRODUCIBILITY.md`](../REPRODUCIBILITY.md) for the environment,
-individual commands, checked-in result records, and evidence limits.
+See [`../REPRODUCIBILITY.md`](../REPRODUCIBILITY.md) for the pinned environment,
+recorded measurements, and offline deployment-archive verification.

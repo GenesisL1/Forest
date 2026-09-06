@@ -24,7 +24,23 @@ deployed code. The local compile suite separately checks source compilation
 with Solidity 0.8.20, IR optimization, 200 optimizer runs, and Istanbul EVM
 targeting.
 
-## Pinned deployment evidence
+## Replayable deployment evidence
+
+A fresh observation at block **13,602,838**, dated **6 September 2026,
+17:20:41 UTC**, retained all 12 model cores (31,185,324 bytes), 1,306 data
+chunks, 12 address tables, five deployed contract runtimes, and the raw
+request/response transcript. The block hash is
+`0xfd3da1020c37ee3c1fe7cd0a6060dbc5ec3ec5fb90c0b812256dc33e467dace3`.
+
+All 108 conformance outputs matched the local evaluator. The compressed
+[archive](../benchmarks/results/live_chain_archive_13602838.tar.gz) and
+[replay record](../benchmarks/results/live_chain_replay_13602838.json)
+support offline checking with a separate Python implementation. The block
+and responses remain provider-reported evidence, without authenticated
+consensus or account-proof verification. Exact commands are in
+[REPRODUCIBILITY.md](../REPRODUCIBILITY.md).
+
+## Historical deployment summaries
 
 The recorded witness selected:
 
@@ -46,7 +62,8 @@ state, the witness observed:
 See the
 [`human-readable witness`](../benchmarks/results/LIVE_CHAIN_WITNESS.md) and
 the [`reproducer`](../benchmarks/live_chain_witness.mjs). The raw provider
-responses and reconstructed deployed bytes are not included in this repository.
+responses and reconstructed deployed bytes for that July observation are not
+included in this repository.
 
 That record is the frozen original witness: it uses one all-zero vector per
 model and contains no live-model gas study. It is retained unchanged for
@@ -74,8 +91,9 @@ simulations, not transaction receipts, inclusion evidence, affordability
 guarantees, or portable fee forecasts.
 
 The values above are retained as a provider-attested historical summary. The
-repository does not include the raw responses needed for offline reproduction;
-an archival RPC endpoint is required for a fresh observation.
+repository does not include the raw July responses needed for offline
+reproduction of those summaries. The separate September archive above
+preserves a fresh observation and does not replace their provenance.
 
 The nine checked relations are:
 
